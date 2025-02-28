@@ -7,6 +7,7 @@ Este repositorio contiene la interfaz de usuario del Sistema de Control de Inven
 ## Tecnologías Utilizadas
 
 - **React con TypeScript:** Para construir una interfaz robusta y escalable.
+- **Vite:** Para un entorno de desarrollo rápido y optimizado.
 - **Tailwind CSS:** Para el desarrollo de estilos y diseño responsivo.
 - **Draft.js:** Para habilitar la edición de textos enriquecidos en la aplicación.
 - **Zustand:** Para la gestión del estado global de la aplicación de forma sencilla y ligera.
@@ -29,8 +30,8 @@ El proyecto se organiza en carpetas que separan componentes, páginas, estilos y
 ## Configuración y Desarrollo
 
 - Se deben instalar todas las dependencias necesarias del proyecto.
-- El desarrollo se realizará en un entorno local utilizando el servidor de desarrollo propio de React.
-- Se ha configurado Tailwind CSS para los estilos globales, Draft.js para la edición de textos enriquecidos y Zustand para la gestión del estado global.
+- El desarrollo se realizará en un entorno local utilizando el servidor de desarrollo propio de Vite.
+- Se ha configurado Tailwind CSS para los estilos globales, Draft.js para la edición de textos enriquecidos, y Zustand para la gestión del estado global.
 - Las interfaces y tipos se definen en archivos separados para mantener el código limpio y organizado.
 
 ## Despliegue
