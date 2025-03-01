@@ -1,0 +1,74 @@
+// actionTypes.ts
+// Este archivo centraliza todos los tipos de acciones utilizados en los stores
+// para evitar errores tipográficos y mejorar la documentación
+
+// Tipos de acciones del UI Store
+export const UI_ACTIONS = {
+  SET_SIDEBAR_VARIANT: 'SET_SIDEBAR_VARIANT',
+  TOGGLE_SIDEBAR_VARIANT: 'TOGGLE_SIDEBAR_VARIANT',
+  SET_ACTIVE_ITEM_ID: 'SET_ACTIVE_ITEM_ID',
+  TOGGLE_EXPAND_ITEM: 'TOGGLE_EXPAND_ITEM',
+  TOGGLE_THEME: 'TOGGLE_THEME',
+  SET_MOBILE_MENU_OPEN: 'SET_MOBILE_MENU_OPEN',
+  TOGGLE_MOBILE_MENU: 'TOGGLE_MOBILE_MENU',
+  SET_ITEM_LOADING: 'SET_ITEM_LOADING',
+  SET_CURRENT_PATH: 'SET_CURRENT_PATH',
+  NAVIGATE_TO: 'NAVIGATE_TO',
+  EXPAND_PARENT_OF_ACTIVE_ITEM: 'EXPAND_PARENT_OF_ACTIVE_ITEM'
+} as const;
+
+// Tipos de acciones del Error Store
+export const ERROR_ACTIONS = {
+  ADD_ERROR: 'ADD_ERROR',
+  REMOVE_ERROR: 'REMOVE_ERROR',
+  CLEAR_ERRORS: 'CLEAR_ERRORS',
+  MARK_ERROR_AS_HANDLED: 'MARK_ERROR_AS_HANDLED',
+} as const;
+
+// Tipos de acciones del Inventory Store
+export const INVENTORY_ACTIONS = {
+  // Productos
+  SET_PRODUCTS: 'SET_PRODUCTS',
+  ADD_PRODUCT: 'ADD_PRODUCT',
+  UPDATE_PRODUCT: 'UPDATE_PRODUCT',
+  DELETE_PRODUCT: 'DELETE_PRODUCT',
+  SET_SELECTED_PRODUCT_ID: 'SET_SELECTED_PRODUCT_ID',
+
+  // Categorías
+  SET_CATEGORIES: 'SET_CATEGORIES',
+  ADD_CATEGORY: 'ADD_CATEGORY',
+  UPDATE_CATEGORY: 'UPDATE_CATEGORY',
+  DELETE_CATEGORY: 'DELETE_CATEGORY',
+  SET_SELECTED_CATEGORY_ID: 'SET_SELECTED_CATEGORY_ID',
+
+  // Proveedores
+  SET_SUPPLIERS: 'SET_SUPPLIERS',
+  ADD_SUPPLIER: 'ADD_SUPPLIER',
+  UPDATE_SUPPLIER: 'UPDATE_SUPPLIER',
+  DELETE_SUPPLIER: 'DELETE_SUPPLIER',
+  SET_SELECTED_SUPPLIER_ID: 'SET_SELECTED_SUPPLIER_ID',
+
+  // Movimientos
+  SET_MOVEMENTS: 'SET_MOVEMENTS',
+  ADD_MOVEMENT: 'ADD_MOVEMENT',
+
+  // Estado general
+  SET_IS_LOADING: 'SET_IS_LOADING',
+  SET_ERROR: 'SET_ERROR',
+  SET_FILTERS: 'SET_FILTERS',
+  RESET_FILTERS: 'RESET_FILTERS',
+
+  // Cargar datos
+  FETCH_PRODUCTS: 'FETCH_PRODUCTS',
+  FETCH_CATEGORIES: 'FETCH_CATEGORIES',
+  FETCH_SUPPLIERS: 'FETCH_SUPPLIERS',
+  FETCH_MOVEMENTS: 'FETCH_MOVEMENTS',
+} as const;
+
+// Tipos para usar en las acciones
+export type UIActionType = typeof UI_ACTIONS[keyof typeof UI_ACTIONS];
+export type ErrorActionType = typeof ERROR_ACTIONS[keyof typeof ERROR_ACTIONS];
+export type InventoryActionType = typeof INVENTORY_ACTIONS[keyof typeof INVENTORY_ACTIONS];
+
+// Tipo unión para todos los tipos de acciones
+export type ActionType = UIActionType | ErrorActionType | InventoryActionType;

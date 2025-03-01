@@ -1,23 +1,29 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Button } from "../../ui/button"
+import { PanelLeft, PanelLeftClose } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { SidebarNavigation } from "./SidebarNavigation"
-import { PanelLeftClose, PanelLeft } from "lucide-react"
+import { TRANSITIONS, ICON_SIZES, BORDERS } from "@/lib/constants"
 
-interface SidebarItem {
+// Tipos para los elementos del sidebar
+export type SidebarItem = {
   id: string
-  label: string
   icon?: React.ReactNode
-  href?: string
-  items?: SidebarItem[]
+  label: string
+  onClick?: () => void
+  subItems?: SidebarItem[]
 }
 
-interface EnhancedSidebarProps {
-  logo: React.ReactNode
-  sidebarSections: {
-    items: SidebarItem[]
-  }[]
+export type SidebarSection = {
+  id: string
+  title: string
+  items: SidebarItem[]
+}
+
+type EnhancedSidebarProps = {
+  logo?: React.ReactNode
+  sidebarSections: SidebarSection[]
   activeItemId?: string
   defaultCollapsed?: boolean
   onItemClick?: (item: SidebarItem) => void
@@ -56,25 +62,25 @@ export function EnhancedSidebar({
 
   return (
     <aside
-      className={`flex flex-col h-screen border-r border-border bg-background transition-all duration-300 ${
+      className={`flex flex-col h-screen bg-background ${BORDERS.sidebar} ${TRANSITIONS.standard} ${
         isCollapsed ? "w-[60px]" : "w-[240px]"
       } ${className}`}
     >
-      <div className="flex items-center h-14 px-3 border-b border-border">
-        <div className={`transition-all duration-300 overflow-hidden ${isCollapsed ? "w-0" : "w-full"}`}>
+      <div className={`flex items-center h-14 px-3 ${BORDERS.divider}`}>
+        <div className={`${TRANSITIONS.standard} overflow-hidden ${isCollapsed ? "opacity-0 w-0" : "opacity-100 w-full"}`}>
           {logo}
         </div>
         <Button
           variant="ghost"
           size="icon"
           onClick={handleToggleCollapse}
-          className="ml-auto"
+          className={`ml-auto ${TRANSITIONS.fast}`}
           aria-label={isCollapsed ? "Expandir barra lateral" : "Colapsar barra lateral"}
         >
           {isCollapsed ? (
-            <PanelLeft className="h-4 w-4" />
+            <PanelLeft className={ICON_SIZES.sm} />
           ) : (
-            <PanelLeftClose className="h-4 w-4" />
+            <PanelLeftClose className={ICON_SIZES.sm} />
           )}
         </Button>
       </div>
@@ -94,3 +100,17 @@ export function EnhancedSidebar({
     </aside>
   )
 }
+
+// Expandir src/lib/constants.ts con más tokens de diseño
+export const SPACING = {
+  xs: "0.25rem", // 4px
+  sm: "0.5rem",  // 8px
+  md: "1rem",    // 16px
+  lg: "1.5rem",  // 24px
+  xl: "2rem",    // 32px
+  // ...
+};
+
+export const TYPOGRAPHY = {
+  // ...
+};

@@ -1,3 +1,5 @@
+import theme from "./src/theme-config";
+
 module.exports = {
   darkMode: ["class"],
   content: [
@@ -16,56 +18,14 @@ module.exports = {
       },
     },
     extend: {
-      colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "#6d4a5c",
-          foreground: "hsl(var(--primary-foreground))",
-          hover: "hsl(var(--primary-hover))",
-          active: "hsl(var(--primary-active))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "#e57373",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        "chart-1": {
-          DEFAULT: "var(--chart-1)",
-        },
-        "chart-2": {
-          DEFAULT: "var(--chart-2)",
-        },
-      },
+      colors: theme.colors,
+      spacing: theme.spacing,
+      fontSize: theme.fontSize,
+      borderRadius: theme.borderRadius,
+      boxShadow: theme.boxShadow,
+      transitionDuration: theme.transitionDuration,
       borderColor: {
         border: "hsl(var(--border))",
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
         "accordion-down": {

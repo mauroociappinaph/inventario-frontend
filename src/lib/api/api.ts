@@ -225,4 +225,31 @@ export const orderService = {
   }
 };
 
+// Servicio para la gestión de usuarios
+export const userService = {
+  getUsers: async (page = 1, limit = 10, role?: string) => {
+    let url = `/users?page=${page}&limit=${limit}`;
+    if (role) url += `&role=${role}`;
+    return api.get(url);
+  },
+  getUserById: async (id: string) => {
+    return api.get(`/users/${id}`);
+  },
+  createUser: async (userData: any) => {
+    return api.post('/users', userData);
+  },
+  updateUser: async (id: string, userData: any) => {
+    return api.put(`/users/${id}`, userData);
+  },
+  deleteUser: async (id: string) => {
+    return api.delete(`/users/${id}`);
+  },
+  getUsersByRole: async (role: string) => {
+    return api.get(`/users/role/${role}`);
+  },
+  updateUserRole: async (id: string, roleData: any) => {
+    return api.put(`/users/${id}/role`, roleData);
+  }
+};
+
 export default api;

@@ -1,76 +1,28 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { Inter } from 'next/font/google'
-import { Toaster } from 'sonner'
-import { ThemeProvider } from "../providers/theme-provider";
+import { ThemeProvider } from "@/providers/theme-provider";
+import { cn } from "@/lib/utils";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  display: "swap",
-});
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-});
-
+// Metadatos de la aplicación para SEO
 export const metadata: Metadata = {
-  title: "Sistema de Control de Inventario",
-  description: "Sistema de Control de Inventario para bares y restaurantes",
+  title: "InvSystem",
+  description: "Sistema de gestión de inventario",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        suppressHydrationWarning
-      >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
+      <body className={cn('min-h-screen font-sans antialiased', inter.variable)}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
-          <Toaster position="top-right" richColors />
         </ThemeProvider>
-        <Script id="hydration-fix" strategy="afterInteractive">
-          {`
-            // Script para eliminar atributos problemáticos añadidos por extensiones
-            function cleanupAttributes() {
-              const html = document.documentElement;
-              if (html.hasAttribute("data-lt-installed")) {
-                html.removeAttribute("data-lt-installed");
-              }
-
-              const body = document.body;
-              if (body.hasAttribute("cz-shortcut-listen")) {
-                body.removeAttribute("cz-shortcut-listen");
-              }
-            }
-
-            // Ejecutar inmediatamente
-            cleanupAttributes();
-
-            // Ejecutar después de un breve retraso
-            setTimeout(cleanupAttributes, 100);
-
-            // Ejecutar periódicamente
-            setInterval(cleanupAttributes, 1000);
-          `}
-        </Script>
       </body>
     </html>
   );

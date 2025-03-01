@@ -17,7 +17,7 @@ import {
   CreditCard,
   HelpCircle
 } from "lucide-react"
-import { EnhancedSidebar, SidebarSection, SidebarUserInfo } from "./enhanced-sidebar"
+import { EnhancedSidebar, SidebarUserInfo } from "./enhanced-sidebar"
 import { Button } from "./ui/button"
 
 export default function SidebarExample() {
@@ -31,6 +31,18 @@ export default function SidebarExample() {
     role: "Administrador",
     initials: "UD"
   }
+  // Definición del tipo SidebarSection
+  type SidebarSection = {
+    id: string;
+    title: string;
+    items: Array<{
+      id: string;
+      icon?: React.ReactNode;
+      label: string;
+      badge?: { count: number; color: string };
+      subItems?: Array<{ id: string; label: string; onClick?: () => void }>;
+    }>;
+  };
 
   // Secciones del sidebar con items
   const sidebarSections: SidebarSection[] = [
@@ -120,7 +132,7 @@ export default function SidebarExample() {
           <EnhancedSidebar
             sections={sidebarSections}
             userInfo={userInfo}
-            activeItemId={activeItemId}
+            selectedItemId={activeItemId}
             onItemClick={handleItemClick}
             footerContent={sidebarFooter}
             variant={sidebarVariant}
@@ -135,7 +147,7 @@ export default function SidebarExample() {
               onClose={() => setIsMobile(false)}
               sections={sidebarSections}
               userInfo={userInfo}
-              activeItemId={activeItemId}
+              selectedItemId={activeItemId}
               onItemClick={handleItemClick}
               footerContent={sidebarFooter}
             />

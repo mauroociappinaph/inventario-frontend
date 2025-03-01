@@ -1,59 +1,58 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Search,
-  MoreVertical,
   Home,
-  Heart,
   Star,
   BarChart2,
   MessageSquare,
-  MapPin,
   Settings,
   Bell,
-  LogOut,
   Menu,
   X,
   Sun,
   Moon,
   Users,
-  Package,
   ShoppingCart,
-  CreditCard,
-  ClipboardList,
-  LayoutDashboard,
-  Sidebar,
-  ChevronRight
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { Input } from "./ui/input"
 import { Button } from "./ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
+import { Avatar } from "./ui/avatar"
 import { InventoryChart } from "./inventory-chart"
 import { InventoryTable } from "./inventory-table"
 import { CircularProgress } from "./circular-progress"
 import { Notifications } from "./notifications"
-import { EnhancedSidebar, SidebarSection, SidebarUserInfo } from "./enhanced-sidebar"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "../components/ui/select"
-import { VirtualList } from "./virtual-list"
+import { EnhancedSidebar, SidebarUserInfo } from "./enhanced-sidebar"
+import { SidebarSection } from "@/stores/uiStore"
 import { cn } from "../lib/utils"
+import { useUIStore } from "@/stores/uiStore"
+import { useAppNavigation } from "@/hooks/useAppNavigation"
+import { useAppTheme } from "@/hooks/useAppTheme"
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [isDarkTheme, setIsDarkTheme] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(true)
-  const [activeItemId, setActiveItemId] = useState("dashboard")
-  const [sidebarVariant, setSidebarVariant] = useState<"default" | "compact" | "expanded">("default")
+
+  // Usar nuestros stores centralizados
+  const {
+    mobileMenuOpen,
+    setMobileMenuOpen,
+    toggleMobileMenu,
+    sidebarVariant,
+    activeItemId,
+  } = useUIStore()
+
+  const { isDarkTheme, toggleTheme } = useAppTheme()
+  const { navigateTo } = useAppNavigation()
+
+  // Referencias para la detección de gestos de deslizamiento
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+  const minSwipeDistance = 50; // Distancia mínima en píxeles para considerar un swipe
 
   // Simulamos que los datos se cargan después de 2 segundos
   useEffect(() => {
@@ -81,35 +80,6 @@ export default function Dashboard() {
     fetchData()
   }, [])
 
-  // Efecto para obtener preferencias de tema y sidebar del localStorage
-  useEffect(() => {
-    // Restaurar la preferencia de tema
-    const savedTheme = localStorage.getItem("theme")
-    if (savedTheme === "dark") {
-      setIsDarkTheme(true)
-      document.documentElement.classList.add("dark")
-    }
-
-    // Restaurar la preferencia de sidebar
-    const savedSidebarVariant = localStorage.getItem("sidebarVariant") as "default" | "compact" | "expanded" | null
-    if (savedSidebarVariant) {
-      setSidebarVariant(savedSidebarVariant)
-    }
-  }, [])
-
-  const toggleTheme = () => {
-    const newThemeState = !isDarkTheme
-    setIsDarkTheme(newThemeState)
-
-    if (newThemeState) {
-      document.documentElement.classList.add("dark")
-      localStorage.setItem("theme", "dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-      localStorage.setItem("theme", "light")
-    }
-  }
-
   const startTour = () => {
     // Implementa la lógica para iniciar el tour
     console.log("Iniciando tour")
@@ -122,49 +92,26 @@ export default function Dashboard() {
     initials: "UD"
   }
 
-  // Optimizar los callbacks con useCallback para evitar re-renderizados innecesarios
-  const handleItemClick = useCallback((itemId: string) => {
-    setActiveItemId(itemId)
-    // En móvil, cerrar el menú después de seleccionar
-    if (mobileMenuOpen) {
-      setMobileMenuOpen(false)
-    }
-    console.log(`Navegando a: ${itemId}`)
-    // En una aplicación real, aquí se manejaría la navegación
-  }, [mobileMenuOpen]);
-
   // Manejar clicks de los subitems con useCallback para evitar re-renderizados
   const handleProductList = useCallback(() => {
-    setActiveItemId("product-list");
-    console.log("Listado de productos");
-  }, []);
+    navigateTo("/dashboard/products", "product-list")
+  }, [navigateTo]);
 
   const handleProductCategories = useCallback(() => {
-    setActiveItemId("product-categories");
-    console.log("Categorías de productos");
-  }, []);
+    navigateTo("/dashboard/products/categories", "product-categories")
+  }, [navigateTo]);
 
   const handleProductInventory = useCallback(() => {
-    setActiveItemId("product-inventory");
-    console.log("Inventario de productos");
-  }, []);
+    navigateTo("/dashboard/inventory", "product-inventory")
+  }, [navigateTo]);
 
   const handleUserList = useCallback(() => {
-    setActiveItemId("user-list");
-    console.log("Listado de usuarios");
-  }, []);
+    navigateTo("/dashboard/users", "user-list")
+  }, [navigateTo]);
 
   const handleUserRoles = useCallback(() => {
-    setActiveItemId("user-roles");
-    console.log("Roles y permisos");
-  }, []);
-
-  // Optimizar el cambio de sidebar con useCallback
-  const toggleSidebarVariant = useCallback(() => {
-    const newVariant = sidebarVariant === "default" ? "compact" : "default"
-    setSidebarVariant(newVariant)
-    localStorage.setItem("sidebarVariant", newVariant)
-  }, [sidebarVariant]);
+    navigateTo("/dashboard/users/roles", "user-roles")
+  }, [navigateTo]);
 
   // Definición memoizada de las secciones y elementos del sidebar
   const sidebarSections = useCallback((): SidebarSection[] => [
@@ -176,12 +123,14 @@ export default function Dashboard() {
           id: "dashboard",
           icon: <Home className="h-4 w-4" />,
           label: "Dashboard",
+          href: "/dashboard",
           badge: { count: 2, color: "bg-primary text-primary-foreground" }
         },
         {
           id: "stats",
           icon: <BarChart2 className="h-4 w-4" />,
-          label: "Estadísticas"
+          label: "Estadísticas",
+          href: "/dashboard/stats"
         },
         {
           id: "products",
@@ -193,459 +142,313 @@ export default function Dashboard() {
             { id: "product-inventory", label: "Inventario", onClick: handleProductInventory }
           ]
         },
-      ]
-    },
-    {
-      id: "management",
-      title: "Gestión",
-      items: [
-        {
-          id: "suppliers",
-          icon: <Heart className="h-4 w-4" />,
-          label: "Proveedores",
-          onClick: () => setActiveItemId("suppliers")
-        },
         {
           id: "orders",
-          icon: <MessageSquare className="h-4 w-4" />,
+          icon: <ShoppingCart className="h-4 w-4" />,
           label: "Pedidos",
-          badge: { count: 5, color: "bg-destructive text-destructive-foreground" },
-          onClick: () => setActiveItemId("orders")
-        },
-        {
-          id: "locations",
-          icon: <MapPin className="h-4 w-4" />,
-          label: "Ubicaciones",
-          onClick: () => setActiveItemId("locations")
+          href: "/dashboard/orders"
         },
         {
           id: "users",
           icon: <Users className="h-4 w-4" />,
           label: "Usuarios",
-          onClick: () => setActiveItemId("users"),
+          badge: { count: 5, color: "bg-blue-500 text-white" },
           subItems: [
             { id: "user-list", label: "Listado", onClick: handleUserList },
             { id: "user-roles", label: "Roles y Permisos", onClick: handleUserRoles }
           ]
-        },
+        }
       ]
     },
     {
-      id: "commerce",
-      title: "Comercio",
+      id: "system",
+      title: "Sistema",
       items: [
         {
-          id: "sales",
-          icon: <ShoppingCart className="h-4 w-4" />,
-          label: "Ventas",
-          onClick: () => setActiveItemId("sales")
+          id: "settings",
+          icon: <Settings className="h-4 w-4" />,
+          label: "Configuración",
+          href: "/dashboard/settings"
         },
         {
-          id: "packages",
-          icon: <Package className="h-4 w-4" />,
-          label: "Paquetes",
-          onClick: () => setActiveItemId("packages")
-        },
-        {
-          id: "reports",
-          icon: <ClipboardList className="h-4 w-4" />,
-          label: "Informes",
-          onClick: () => setActiveItemId("reports")
-        },
+          id: "help",
+          icon: <MessageSquare className="h-4 w-4" />,
+          label: "Ayuda",
+          href: "/dashboard/help"
+        }
       ]
     }
-  ], [
-    handleProductList,
-    handleProductCategories,
-    handleProductInventory,
-    handleUserList,
-    handleUserRoles
-  ]);
+  ], [handleProductList, handleProductCategories, handleProductInventory, handleUserList, handleUserRoles]);
 
-  // Footer personalizado para el sidebar
-  const sidebarFooter = (
-    <div className="flex gap-sm">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="flex-1 justify-center text-dim-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-standard"
-        aria-label="Configuración"
-      >
-        <Settings className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="flex-1 justify-center text-dim-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-standard"
-        aria-label="Notificaciones"
-      >
-        <Bell className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="flex-1 justify-center text-dim-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-standard"
-        aria-label="Cerrar sesión"
-      >
-        <LogOut className="h-4 w-4" />
-      </Button>
-    </div>
-  )
+  // Manejadores de eventos para detectar gestos de deslizamiento
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+
+    const distance = touchEndX.current - touchStartX.current;
+    const isSwipe = Math.abs(distance) > minSwipeDistance;
+
+    if (isSwipe) {
+      // Deslizamiento de izquierda a derecha (abrir menú)
+      if (distance > 0 && !mobileMenuOpen) {
+        toggleMobileMenu();
+        announceMenuChange(true);
+      }
+      // Deslizamiento de derecha a izquierda (cerrar menú)
+      else if (distance < 0 && mobileMenuOpen) {
+        toggleMobileMenu();
+        announceMenuChange(false);
+      }
+    }
+
+    // Resetear las posiciones
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
+
+  // Crear un anuncio accesible para cambios de menú
+  const announceMenuChange = (isOpen: boolean) => {
+    const message = isOpen ? "Menú abierto" : "Menú cerrado";
+
+    // Usar un div aria-live para anunciar cambios a lectores de pantalla
+    const liveRegion = document.createElement('div');
+    liveRegion.setAttribute('aria-live', 'assertive');
+    liveRegion.setAttribute('aria-atomic', 'true');
+    liveRegion.classList.add('sr-only'); // Oculto visualmente
+    liveRegion.textContent = message;
+
+    document.body.appendChild(liveRegion);
+
+    // Eliminar después de ser anunciado
+    setTimeout(() => {
+      document.body.removeChild(liveRegion);
+    }, 1000);
+  };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {/* EnhancedSidebar - Desktop */}
-      <div className="hidden md:block">
-        <EnhancedSidebar
-          sections={sidebarSections()}
-          userInfo={userInfo}
-          activeItemId={activeItemId}
-          onItemClick={handleItemClick}
-          footerContent={sidebarFooter}
-          variant={sidebarVariant}
-        />
-      </div>
-
-      {/* Mobile Menu Overlay */}
+    <div
+      className={cn(
+        "flex h-screen overflow-hidden",
+        isDarkTheme ? "dark" : ""
+      )}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Sidebar para móvil - se muestra como modal cuando mobileMenuOpen es true */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden" onClick={() => setMobileMenuOpen(false)}>
           <EnhancedSidebar
-            isMobile={true}
-            onClose={() => setMobileMenuOpen(false)}
             sections={sidebarSections()}
             userInfo={userInfo}
-            activeItemId={activeItemId}
-            onItemClick={handleItemClick}
-            footerContent={sidebarFooter}
+            isMobile={true}
+            onClose={() => setMobileMenuOpen(false)}
+            selectedItemId={activeItemId}
           />
         </div>
       )}
 
-      {/* Main Content */}
+      {/* Sidebar para desktop - siempre visible */}
+      <div className="hidden lg:block">
+        <EnhancedSidebar
+          variant={sidebarVariant as "default" | "compact"}
+          sections={sidebarSections()}
+          userInfo={userInfo}
+          selectedItemId={activeItemId}
+        />
+      </div>
+
+      {/* Contenido principal */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="h-14 border-b border-border flex items-center gap-md spacing-x-md bg-card flex-shrink-0">
-          <div className="md:hidden">
+        {/* Barra superior */}
+        <header className="border-b h-16 flex items-center justify-between px-4">
+          <div className="flex items-center">
+            {/* Botón de menú en móvil */}
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setMobileMenuOpen(true)}
-              aria-label="Abrir menú"
-              className="transition-standard"
+              className="mr-2 lg:hidden"
+              onClick={() => {
+                toggleMobileMenu();
+                announceMenuChange(!mobileMenuOpen);
+              }}
+              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={mobileMenuOpen}
             >
-              <Menu className="h-5 w-5" />
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
+
+            {/* Búsqueda */}
+            <div className="relative ml-2">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar..."
+                className="pl-8 w-[200px] sm:w-[300px] rounded-xl"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
 
-          <div className="flex-1 max-w-md relative">
-            <Search className="absolute left-sm top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar..."
-              className="pl-10 bg-muted/40 border-none h-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="Buscar en la aplicación"
-            />
-          </div>
-
-          <div className="flex items-center gap-sm">
+          <div className="flex items-center space-x-2">
+            {/* Botón de tema */}
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 transition-standard"
-              onClick={toggleSidebarVariant}
-              aria-label="Cambiar vista de sidebar"
-            >
-              <Sidebar className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative h-9 w-9 transition-standard"
-              aria-label="Notificaciones"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" aria-hidden="true"></span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 transition-standard"
               onClick={toggleTheme}
               aria-label={isDarkTheme ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
             >
               {isDarkTheme ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-            <Avatar className="h-9 w-9">
-              <AvatarImage src="/placeholder.svg" alt={userInfo.name} />
-              <AvatarFallback>{userInfo.initials}</AvatarFallback>
-            </Avatar>
+
+            {/* Notificaciones */}
+            <Button variant="ghost" size="icon" aria-label="Ver notificaciones">
+              <Bell className="h-5 w-5" />
+            </Button>
+
+            {/* Avatar del usuario - ahora usando el componente correcto */}
+            <Avatar
+              initials="UD"
+              size="sm"
+              alt="Usuario Demo"
+            />
           </div>
         </header>
 
-        {/* Dashboard Content */}
-        <main className="flex-1 overflow-auto">
-          <div className="container mx-auto spacing-md max-w-7xl">
-            {showWelcomeBanner && (
-              <div className="bg-primary/10 border border-primary/20 rounded-lg spacing-md mb-lg relative">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-sm right-sm transition-standard"
-                  onClick={() => setShowWelcomeBanner(false)}
-                  aria-label="Cerrar banner"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-                <h3 className="text-base font-medium mb-sm">¡Bienvenido a InvSystem!</h3>
-                <p className="text-sm text-muted-foreground mb-md">
-                  Esta es tu nueva interfaz de gestión de inventario. ¿Te gustaría un recorrido rápido?
-                </p>
-                <div className="flex flex-wrap gap-sm">
-                  <Button size="sm" onClick={() => startTour()} className="transition-standard">
-                    Iniciar recorrido
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setShowWelcomeBanner(false)} className="transition-standard">
-                    Omitir
+        {/* Contenido del dashboard */}
+        <main className="flex-1 overflow-auto p-4 pb-0">
+          {/* Banner de bienvenida - se puede ocultar */}
+          {showWelcomeBanner && (
+            <div className="rounded-lg border bg-card text-card-foreground shadow mb-6 relative">
+              <div className="flex flex-col space-y-1.5 p-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-semibold text-primary">
+                    ¡Bienvenido al Dashboard!
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowWelcomeBanner(false)}
+                    aria-label="Cerrar mensaje de bienvenida"
+                  >
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-            )}
-
-            <div className="section-spacing">
-              <h1 className="text-2xl font-bold mb-xs">Dashboard</h1>
-              <p className="text-muted-foreground">Bienvenido de nuevo, aquí tienes un resumen de tu inventario</p>
-            </div>
-
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md section-spacing">
-              {error ? (
-                <Card className="col-span-full border-destructive bg-destructive/10 transition-standard">
-                  <CardContent className="card-padding flex items-center gap-md">
-                    <div className="rounded-full p-2 bg-destructive/20 text-destructive">
-                      <X className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">Error al cargar los datos</h3>
-                      <p className="text-sm text-muted-foreground">{error}</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="ml-auto border-destructive text-destructive hover:bg-destructive/10 transition-standard"
-                      onClick={() => window.location.reload()}
-                    >
-                      Reintentar
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                <>
-                  {/* Total Products */}
-                  <Card className="transition-standard">
-                    <CardHeader className="card-header">
-                      <CardTitle className="text-base font-medium">Productos Registrados</CardTitle>
-                      <div className="text-xs text-muted-foreground">
-                        Comparado con el período anterior
-                      </div>
-                    </CardHeader>
-                    <CardContent className="card-content">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-2xl font-bold">2.200.150</div>
-                          <div className="flex gap-sm mt-xs">
-                            <div className="text-sm text-emerald-500 flex items-center">
-                              <svg className="h-4 w-4 mr-xs" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                              </svg>
-                              <span>12.5%</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">este mes</div>
-                          </div>
-                        </div>
-                        <div className="w-20 h-20 flex-shrink-0">
-                          <CircularProgress value={80} color="var(--primary)" size={80} />
-                          <div className="text-xs text-center mt-xs">Rendimiento</div>
-                        </div>
-                      </div>
-                      <div className="h-10 mt-sm">
-                        {/* Gráfico de tendencia */}
-                        <div className="flex items-end h-full gap-[2px]">
-                          {[40, 25, 35, 30, 45, 35, 55, 40, 60, 45, 70, 55, 80].map((value, i) => (
-                            <div
-                              key={i}
-                              className="flex-1 bg-primary/20 rounded-sm transition-standard"
-                              style={{ height: `${value}%` }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Stock Level */}
-                  <Card className="transition-standard">
-                    <CardHeader className="card-header">
-                      <CardTitle className="text-base font-medium">Nivel de Stock</CardTitle>
-                    </CardHeader>
-                    <CardContent className="card-content">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-2xl font-bold">1.941.000</div>
-                          <div className="text-sm text-rose-500 flex items-center mt-xs">
-                            <svg className="h-4 w-4 mr-xs" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                            </svg>
-                            <span>8.3% este mes</span>
-                          </div>
-                        </div>
-                        <div className="w-14 h-14 flex-shrink-0">
-                          <CircularProgress value={75} color="var(--destructive)" size={56} />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Revenue Card */}
-                  <Card className="transition-standard">
-                    <CardHeader className="card-header">
-                      <CardTitle className="text-base font-medium">Ganancias</CardTitle>
-                    </CardHeader>
-                    <CardContent className="card-content">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-2xl font-bold">12.123$</div>
-                          <div className="text-sm text-emerald-500 flex items-center mt-xs">
-                            <svg className="h-4 w-4 mr-xs" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                            </svg>
-                            <span>23.1% este mes</span>
-                          </div>
-                        </div>
-                        <div className="w-14 h-14 flex-shrink-0">
-                          <CircularProgress value={65} color="var(--chart-1)" size={56} />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              )}
-            </div>
-
-            {/* Main Content Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-md">
-              {/* Inventory Movement Chart */}
-              <Card className="lg:col-span-8 transition-standard">
-                <CardHeader className="flex flex-row items-center justify-between card-padding">
-                  <CardTitle className="text-base font-medium">Movimiento de Inventario</CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 transition-standard"
-                    aria-label="Opciones de gráfico"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </CardHeader>
-                <CardContent className="spacing-md pt-0">
-                  {isLoading ? (
-                    <div className="animate-pulse space-y-md">
-                      <div className="h-4 bg-muted rounded w-3/4"></div>
-                      <div className="h-80 bg-muted rounded"></div>
-                    </div>
-                  ) : (
-                    <div className="h-[300px]">
-                      <InventoryChart />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Quick Actions & Notifications */}
-              <div className="lg:col-span-4 grid grid-cols-1 gap-md">
-                <Card className="transition-standard">
-                  <CardHeader className="flex flex-row items-center justify-between card-padding">
-                    <CardTitle className="text-base font-medium">Acciones Rápidas</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-sm card-padding pt-0">
-                    <Button size="sm" className="transition-standard">Nuevo Producto</Button>
-                    <Button size="sm" variant="outline" className="transition-standard">Exportar Datos</Button>
-                    <Button size="sm" variant="secondary" className="transition-standard">Generar Reporte</Button>
-                    <Button size="sm" variant="outline" className="transition-standard">Configurar Alertas</Button>
-                  </CardContent>
-                </Card>
-
-                <Card className="transition-standard">
-                  <CardHeader className="flex flex-row items-center justify-between card-padding">
-                    <CardTitle className="text-base font-medium">Notificaciones</CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 transition-standard"
-                      aria-label="Opciones de notificaciones"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </CardHeader>
-                  <CardContent className="card-padding pt-0 max-h-[200px] overflow-auto">
-                    <Notifications />
-                  </CardContent>
-                </Card>
+              <div className="p-6 pt-0">
+                <p className="text-muted-foreground">
+                  Este es tu nuevo panel de control. Puedes personalizar esta vista según tus necesidades.
+                </p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={startTour}>
+                  Comenzar Tour
+                </Button>
               </div>
+            </div>
+          )}
 
-              {/* Inventory Table */}
-              <Card className="lg:col-span-12 transition-standard">
-                <CardHeader className="flex flex-row items-center justify-between card-padding">
-                  <CardTitle className="text-base font-medium">Detalle de Inventario</CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 transition-standard"
-                    aria-label="Opciones de inventario"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Esqueletos de carga */}
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Card key={index} className="animate-pulse">
+                  <CardHeader className="pb-2">
+                    <div className="h-6 bg-muted rounded w-1/2" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-24 bg-muted rounded" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="rounded-lg border border-destructive bg-destructive/10 p-6 text-center">
+              <h2 className="text-lg font-semibold text-destructive mb-2">Error al cargar los datos</h2>
+              <p className="text-destructive/90 mb-4">{error}</p>
+              <Button
+                variant="outline"
+                onClick={() => window.location.reload()}
+                className="border-destructive text-destructive hover:bg-destructive/10"
+              >
+                Reintentar
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Tarjeta de vista general */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle>Resumen del Inventario</CardTitle>
                 </CardHeader>
-                <CardContent className="card-padding pt-0">
-                  <div className="flex flex-wrap gap-sm mb-md">
-                    <Input placeholder="Filtrar por nombre" className="max-w-[200px]" />
-                    <Select>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos</SelectItem>
-                        <SelectItem value="electronica">Electrónica</SelectItem>
-                        <SelectItem value="ropa">Ropa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button size="sm" variant="outline" className="transition-standard">Aplicar Filtros</Button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    {isLoading ? (
-                      <div className="animate-pulse space-y-sm">
-                        <div className="h-8 bg-muted rounded w-full mb-sm"></div>
-                        <div className="h-8 bg-muted/80 rounded w-full mb-sm"></div>
-                        <div className="h-8 bg-muted/60 rounded w-full mb-sm"></div>
-                        <div className="h-8 bg-muted/40 rounded w-full mb-sm"></div>
+                <CardContent>
+                  <InventoryChart />
+                </CardContent>
+              </Card>
+
+              {/* Tarjeta de estadísticas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Estadísticas</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-6">
+                  <div className="flex items-center gap-4">
+                    <CircularProgress value={78} size="md" variant="primary" />
+                    <div>
+                      <div className="text-2xl font-bold">78%</div>
+                      <div className="text-sm text-muted-foreground">
+                        Nivel de stock
                       </div>
-                    ) : (
-                      <InventoryTable />
-                    )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-sm mt-md">
-                    <Button size="sm" className="bg-primary hover:bg-primary-hover transition-standard">
-                      Agregar Producto
-                    </Button>
-                    <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10 transition-standard">
-                      Eliminar Seleccionados
-                    </Button>
+                  <div className="flex items-center gap-4">
+                    <CircularProgress value={23} size="md" variant="destructive" />
+                    <div>
+                      <div className="text-2xl font-bold">23%</div>
+                      <div className="text-sm text-muted-foreground">
+                        Productos por reordenar
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <CircularProgress value={92} size="md" variant="success" />
+                    <div>
+                      <div className="text-2xl font-bold">92%</div>
+                      <div className="text-sm text-muted-foreground">
+                        Pedidos completados
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Tarjeta de movimientos recientes */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle>Movimientos Recientes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <InventoryTable />
+                </CardContent>
+              </Card>
+
+              {/* Tarjeta de notificaciones */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Notificaciones</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Notifications />
+                </CardContent>
+              </Card>
             </div>
-          </div>
+          )}
         </main>
       </div>
     </div>
