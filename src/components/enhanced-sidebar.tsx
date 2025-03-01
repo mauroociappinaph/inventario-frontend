@@ -360,7 +360,7 @@ export function EnhancedSidebar({
           {userInfo && (
             <div className={`flex items-center ${variant === "compact" ? "justify-center" : "px-sm mb-md"}`}>
               <Avatar
-                src={userInfo.avatar}
+                src={userInfo.avatar} // Cambiado de avatarUrl a src
                 alt={userInfo.name}
                 initials={userInfo.initials}
                 size="sm"

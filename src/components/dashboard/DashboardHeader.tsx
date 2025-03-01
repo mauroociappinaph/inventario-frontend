@@ -29,7 +29,7 @@ type DashboardHeaderProps = {
 
 export function DashboardHeader({
   isDarkTheme,
-  mobileMenuOpen,
+
   searchQuery,
   userInfo,
   setMobileMenuOpen,

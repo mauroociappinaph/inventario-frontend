@@ -8,7 +8,6 @@ import { MainLayout } from "@/components/layout/MainLayout"
 
 export default function DashboardPage() {
   // Estados para la página
-  const [isLoading, setIsLoading] = useState(false)
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(true)
   const [activeItemId, setActiveItemId] = useState("dashboard")
 
@@ -22,6 +21,8 @@ export default function DashboardPage() {
   // Definición de las secciones del sidebar
   const sidebarSections = [
     {
+      id: "main-navigation",
+      title: "Navegación Principal",
       items: [
         {
           id: "dashboard",
@@ -112,12 +113,12 @@ export default function DashboardPage() {
       <div className="space-y-md">
         {/* Grilla de estadísticas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
-          <DashboardStats isLoading={isLoading} error={null} />
+          <DashboardStats isLoading={false} error={null} />
         </div>
 
         {/* Contenido principal */}
         <InventoryOverview
-          isLoading={isLoading}
+          isLoading={false}
           showWelcomeBanner={showWelcomeBanner}
           setShowWelcomeBanner={setShowWelcomeBanner}
           startTour={startTour}

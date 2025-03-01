@@ -1,4 +1,5 @@
 import axios from 'axios';
+import Cookies from 'js-cookie';
 
 // Configuración base de axios
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -30,6 +31,9 @@ export interface AuthResponse {
   user: User;
 }
 
+// Tiempo de expiración de la cookie en días (7 días por defecto)
+const COOKIE_EXPIRY_DAYS = 7;
+
 // Servicio de autenticación
 const authService = {
   // Iniciar sesión
@@ -38,10 +42,18 @@ const authService = {
       const response = await axios.post<AuthResponse>(`${API_URL}/auth/login`, credentials);
       const data = response.data;
 
-      // Guardar el token en localStorage
+      // Guardar el token en localStorage y cookies
       if (data.access_token) {
+        // Guardar en localStorage
         localStorage.setItem('auth_token', data.access_token);
         localStorage.setItem('user_data', JSON.stringify(data.user));
+
+        // Guardar en cookies para que sea accesible por el middleware
+        Cookies.set('auth_token', data.access_token, {
+          expires: COOKIE_EXPIRY_DAYS,
+          path: '/',
+          sameSite: 'strict'
+        });
       }
 
       return data;
@@ -51,16 +63,24 @@ const authService = {
     }
   },
 
-  // Registrar un nuevo usuario
+  // Registrar nuevo usuario
   async register(userData: RegisterData): Promise<AuthResponse> {
     try {
       const response = await axios.post<AuthResponse>(`${API_URL}/auth/register`, userData);
       const data = response.data;
 
-      // Guardar el token en localStorage si el registro incluye login automático
+      // Guardar el token en localStorage y cookies
       if (data.access_token) {
+        // Guardar en localStorage
         localStorage.setItem('auth_token', data.access_token);
         localStorage.setItem('user_data', JSON.stringify(data.user));
+
+        // Guardar en cookies
+        Cookies.set('auth_token', data.access_token, {
+          expires: COOKIE_EXPIRY_DAYS,
+          path: '/',
+          sameSite: 'strict'
+        });
       }
 
       return data;
@@ -74,6 +94,10 @@ const authService = {
   logout(): void {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
+
+    // Eliminar también la cookie
+    Cookies.remove('auth_token', { path: '/' });
+
     // Opcional: redirigir a la página de inicio o login
     window.location.href = '/login';
   },
@@ -81,7 +105,11 @@ const authService = {
   // Verificar si el usuario está autenticado
   isAuthenticated(): boolean {
     if (typeof window === 'undefined') return false; // Para SSR
-    return localStorage.getItem('auth_token') !== null;
+
+    const localToken = localStorage.getItem('auth_token');
+    const cookieToken = Cookies.get('auth_token');
+
+    return localToken !== null || cookieToken !== undefined;
   },
 
   // Obtener el usuario actual
@@ -94,7 +122,12 @@ const authService = {
   // Obtener el token de autenticación
   getToken(): string | null {
     if (typeof window === 'undefined') return null; // Para SSR
-    return localStorage.getItem('auth_token');
+
+    // Intentar obtener primero de localStorage, luego de cookies
+    const localToken = localStorage.getItem('auth_token');
+    const cookieToken = Cookies.get('auth_token');
+
+    return localToken || cookieToken || null;
   }
 };
 

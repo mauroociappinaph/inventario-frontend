@@ -1,6 +1,9 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
+import { Suspense } from 'react'
+import { InventoryChart } from '@/components/inventory-chart'
+import { InventoryAlerts } from '@/components/inventory-alerts'
 
 export default function Home() {
   return (
@@ -119,6 +122,53 @@ export default function Home() {
                 <p className="text-gray-600">
                   Set up automatic reordering when inventory reaches predefined thresholds.
                 </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="container mx-auto p-4 md:p-6">
+          <h1 className="text-3xl font-bold mb-6">Panel de Control de Inventario</h1>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Columna principal con gráficos */}
+            <div className="lg:col-span-2">
+              <h2 className="text-xl font-semibold mb-4">Análisis de Inventario</h2>
+              <div className="bg-card rounded-lg shadow-sm overflow-hidden">
+                <Suspense fallback={<div className="p-8 text-center">Cargando gráficos...</div>}>
+                  <InventoryChart />
+                </Suspense>
+              </div>
+            </div>
+
+            {/* Columna lateral con alertas */}
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Alertas del Sistema</h2>
+              <Suspense fallback={<div className="p-8 text-center">Cargando alertas...</div>}>
+                <InventoryAlerts />
+              </Suspense>
+
+              <div className="mt-6">
+                <h2 className="text-xl font-semibold mb-4">Acciones Rápidas</h2>
+                <div className="bg-card rounded-lg shadow-sm p-4">
+                  <ul className="space-y-2">
+                    <li className="p-2 hover:bg-muted rounded transition-colors">
+                      <a href="/inventory" className="flex items-center text-primary">
+                        <span className="ml-2">Ver inventario completo</span>
+                      </a>
+                    </li>
+                    <li className="p-2 hover:bg-muted rounded transition-colors">
+                      <a href="/reports" className="flex items-center text-primary">
+                        <span className="ml-2">Generar informes</span>
+                      </a>
+                    </li>
+                    <li className="p-2 hover:bg-muted rounded transition-colors">
+                      <a href="/settings" className="flex items-center text-primary">
+                        <span className="ml-2">Configurar alertas</span>
+                      </a>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
