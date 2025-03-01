@@ -3,13 +3,13 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import authService from '@/lib/api/auth-service';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/context/auth-context';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { login } = useAuth(); // Usar el hook de autenticación
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -33,9 +34,14 @@ export default function LoginPage() {
         return;
       }
 
-      await authService.login({ email, password });
+      // Usar el método login del contexto en lugar de llamar directamente al servicio
+      await login(email, password);
       toast.success('Inicio de sesión exitoso');
-      router.push('/'); // Redirigir a la página principal después del login
+
+      // Pequeña pausa para asegurar que el estado se actualice antes de la redirección
+      setTimeout(() => {
+        router.push('/');
+      }, 100);
     } catch (error: unknown) {
       console.error('Error de inicio de sesión:', error);
       let errorMessage = 'Error al iniciar sesión';

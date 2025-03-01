@@ -21,6 +21,12 @@ import { Button } from "./button";
 import { useAuth } from "@/context/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "./simple-avatar";
 import { useTheme } from "next-themes";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./tooltip";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -162,6 +168,26 @@ export function Navbar() {
                     <Bell className="h-5 w-5 text-sky-700 dark:text-sky-300" />
                     <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
                   </Button>
+
+                  {/* Botón de cerrar sesión */}
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleLogout}
+                          className="relative"
+                          aria-label="Cerrar sesión"
+                        >
+                          <LogOut className="h-5 w-5 text-sky-700 dark:text-sky-300" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Cerrar sesión</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
                   {/* Usuario y menú desplegable */}
                   <div className="relative" ref={userMenuRef}>
@@ -335,7 +361,7 @@ export function Navbar() {
                   })}
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-sky-200 dark:text-red-400 dark:hover:bg-sky-800"
+                    className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-red-50 border border-red-200 mt-2 dark:text-red-400 dark:hover:bg-red-900/20 dark:border-red-800"
                   >
                     <div className="flex items-center gap-2">
                       <LogOut className="h-4 w-4" />

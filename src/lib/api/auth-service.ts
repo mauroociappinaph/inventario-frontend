@@ -156,15 +156,17 @@ const authService = {
   },
 
   // Cerrar sesión
-  logout(): void {
+  logout(redirect = false): void {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
 
     // Eliminar también la cookie
     Cookies.remove('auth_token', { path: '/' });
 
-    // Opcional: redirigir a la página de inicio o login
-    window.location.href = '/login';
+    // Opcional: redirigir a la página de inicio o login, solo si se solicita
+    if (redirect) {
+      window.location.href = '/login';
+    }
   },
 
   // Verificar si el usuario está autenticado

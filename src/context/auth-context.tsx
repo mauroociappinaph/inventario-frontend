@@ -10,7 +10,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (userData: any) => Promise<void>;
-  logout: () => void;
+  logout: (redirect?: boolean) => void;
   error: string | null;
 }
 
@@ -124,9 +124,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Función para cerrar sesión
-  const logout = () => {
-    authService.logout();
+  const logout = (redirect = true) => {
+    authService.logout(false); // No redirigir desde el servicio
     setUser(null);
+
+    // Si se solicita redirección, hacerlo desde el contexto
+    if (redirect) {
+      // Usar setTimeout para asegurar que el estado se actualice primero
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 100);
+    }
   };
 
   // Valor del contexto

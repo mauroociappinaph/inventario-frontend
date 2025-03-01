@@ -50,9 +50,18 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
         } else if (axios.isAxiosError(err)) {
           // Error de axios
           const axiosError = err as AxiosError
+          console.log("Detalles completos del error:", {
+            status: axiosError.response?.status,
+            data: axiosError.response?.data,
+            headers: axiosError.response?.headers,
+            url: axiosError.config?.url
+          })
+
           if (axiosError.response && (axiosError.response.status === 401 || axiosError.response.status === 403)) {
             setNeedsLogin(true)
             setError("Necesitas iniciar sesión para ver las estadísticas completas")
+          } else if (axiosError.response && axiosError.response.status === 400) {
+            setError(`Error en la solicitud: Formato incorrecto o datos inválidos (${axiosError.message})`)
           } else {
             setError(`Error al cargar los datos: ${axiosError.message}`)
           }
@@ -165,24 +174,26 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
         <CardContent className="card-content">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-2xl font-bold">{productStats.summary.totalProducts.toLocaleString()}</div>
+              <div className="text-2xl font-bold">
+                {productStats?.summary?.totalProducts ? productStats.summary.totalProducts.toLocaleString() : '0'}
+              </div>
               <div className="flex gap-sm mt-xs">
-                <div className={`text-sm flex items-center ${productStats.summary.percentageChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                <div className={`text-sm flex items-center ${(productStats?.summary?.percentageChange || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                   <svg className="h-4 w-4 mr-xs" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    {productStats.summary.percentageChange >= 0 ? (
+                    {(productStats?.summary?.percentageChange || 0) >= 0 ? (
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                     ) : (
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                     )}
                   </svg>
-                  <span>{Math.abs(productStats.summary.percentageChange)}%</span>
+                  <span>{Math.abs(productStats?.summary?.percentageChange || 0)}%</span>
                 </div>
                 <div className="text-xs text-muted-foreground">este mes</div>
               </div>
             </div>
             <div className="w-20 h-20 flex-shrink-0">
               <CircularProgress
-                value={productStats.summary.percentActiveProducts || 80}
+                value={productStats?.summary?.percentActiveProducts || 80}
                 color="var(--primary)"
                 size="xl"
               />
@@ -192,9 +203,9 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
           <div className="h-10 mt-sm">
             {/* Gráfico de tendencia usando datos reales si están disponibles */}
             <div className="flex items-end h-full gap-[2px]">
-              {(productStats.stockTrend || Array(13).fill(0).map(() => 40 + Math.random() * 40)).map((item, index) => {
+              {(productStats?.stockTrend || Array(13).fill(0).map(() => 40 + Math.random() * 40)).map((item, index) => {
                 // Si tenemos datos reales, usar el valor normalizado
-                const value = typeof item === 'object'
+                const value = typeof item === 'object' && productStats?.stockTrend
                   ? (item.totalStock / Math.max(...productStats.stockTrend.map(t => t.totalStock)) * 100)
                   : item;
 
@@ -219,13 +230,13 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
         <CardContent className="card-content">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-2xl font-bold">{productStats.summary.stockLevel.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{productStats?.summary?.stockLevel ? productStats.summary.stockLevel.toLocaleString() : '0'}</div>
               <div className="text-sm flex items-center mt-xs space-x-2">
                 <div className="text-amber-500 flex items-center">
                   <svg className="h-4 w-4 mr-xs" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
-                  <span>{productStats.summary.productsWithLowStock} con stock bajo</span>
+                  <span>{productStats?.summary?.productsWithLowStock || 0} con stock bajo</span>
                 </div>
               </div>
             </div>
@@ -239,7 +250,7 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
           </div>
 
           {/* Categorías de productos */}
-          {productStats.categories && productStats.categories.length > 0 && (
+          {productStats?.categories && productStats.categories.length > 0 && (
             <div className="mt-4 pt-4 border-t">
               <div className="text-sm font-medium mb-2">Distribución por Categoría</div>
               <div className="space-y-2">
@@ -272,9 +283,9 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
         <CardContent className="card-content">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-2xl font-bold">${productStats.summary.revenue.toLocaleString()}</div>
+              <div className="text-2xl font-bold">${productStats?.summary?.revenue ? productStats.summary.revenue.toLocaleString() : '0'}</div>
               <div className="text-sm flex items-center mt-xs">
-                <span className="text-muted-foreground">Precio promedio: ${productStats.summary.avgPrice.toFixed(2)}</span>
+                <span className="text-muted-foreground">Precio promedio: ${productStats?.summary?.avgPrice ? productStats.summary.avgPrice.toFixed(2) : '0.00'}</span>
               </div>
             </div>
             <div className="w-16 h-16 flex-shrink-0">
@@ -287,7 +298,7 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
           </div>
 
           {/* Productos más caros */}
-          {productStats.topExpensiveProducts && productStats.topExpensiveProducts.length > 0 && (
+          {productStats?.topExpensiveProducts && productStats.topExpensiveProducts.length > 0 && (
             <div className="mt-4 pt-4 border-t">
               <div className="text-sm font-medium mb-2">Productos más Valorados</div>
               <div className="space-y-2">
@@ -307,15 +318,15 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center p-2 bg-primary/10 rounded">
                   <div className="text-xs text-muted-foreground">Entradas</div>
-                  <div className="font-medium">{inventoryStats.movement.entriesCount}</div>
+                  <div className="font-medium">{inventoryStats?.movement?.entriesCount || 0}</div>
                 </div>
                 <div className="text-center p-2 bg-primary/10 rounded">
                   <div className="text-xs text-muted-foreground">Salidas</div>
-                  <div className="font-medium">{inventoryStats.movement.exitsCount}</div>
+                  <div className="font-medium">{inventoryStats?.movement?.exitsCount || 0}</div>
                 </div>
                 <div className="text-center p-2 bg-primary/10 rounded">
                   <div className="text-xs text-muted-foreground">Total</div>
-                  <div className="font-medium">{inventoryStats.movement.totalMovements}</div>
+                  <div className="font-medium">{inventoryStats?.movement?.totalMovements || 0}</div>
                 </div>
               </div>
             </div>
@@ -324,7 +335,7 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
       </Card>
 
       {/* Tarjeta adicional para mostrar productos más movidos */}
-      {inventoryStats && inventoryStats.topMovedProducts && inventoryStats.topMovedProducts.length > 0 && (
+      {inventoryStats?.topMovedProducts && inventoryStats.topMovedProducts.length > 0 && (
         <Card className="col-span-full mt-4">
           <CardHeader className="card-header">
             <CardTitle className="text-base font-medium">Productos más Movidos</CardTitle>

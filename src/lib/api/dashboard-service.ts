@@ -105,10 +105,40 @@ class DashboardService {
         throw new Error('No se encontró token de autenticación');
       }
 
-      const response = await API.get('/products/statistics', {
+      const response = await API.get('/products/stats', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return response.data;
+
+      // Verificar si la respuesta tiene la estructura esperada
+      // Si no, transformarla al formato necesario
+      const responseData = response.data;
+
+      if (!responseData || !responseData.summary || typeof responseData.summary.totalProducts === 'undefined') {
+        console.warn('La respuesta de la API no tiene el formato esperado, transformando datos...');
+
+        // Extraer los datos disponibles o usar valores por defecto
+        const extractedData = {
+          summary: {
+            totalProducts: responseData?.totalProducts || 0,
+            activeProducts: responseData?.activeProducts || 0,
+            newProducts: responseData?.newProducts || 0,
+            percentageChange: responseData?.percentageChange || 0,
+            productsWithNoStock: responseData?.productsWithNoStock || 0,
+            productsWithLowStock: responseData?.lowStockProducts || 0,
+            stockLevel: responseData?.stockLevel || 0,
+            revenue: responseData?.revenue || 0,
+            avgPrice: responseData?.avgPrice || 0,
+            percentActiveProducts: responseData?.percentActiveProducts || 0
+          },
+          categories: responseData?.categories || [],
+          topExpensiveProducts: responseData?.topProducts || [],
+          stockTrend: responseData?.stockTrend || []
+        };
+
+        return extractedData;
+      }
+
+      return responseData;
     } catch (error) {
       console.error('Error al obtener estadísticas de productos:', error);
       this.handleApiError(error);
@@ -146,7 +176,35 @@ class DashboardService {
       const response = await API.get('/inventory/statistics', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return response.data;
+
+      // Verificar si la respuesta tiene la estructura esperada
+      const responseData = response.data;
+
+      if (!responseData || !responseData.movement || typeof responseData.movement.entriesCount === 'undefined') {
+        console.warn('La respuesta de inventario no tiene el formato esperado, transformando datos...');
+
+        // Extraer los datos disponibles o usar valores por defecto
+        const extractedData: InventoryStats = {
+          general: {
+            totalProducts: responseData?.general?.totalProducts || responseData?.totalProducts || 0,
+            activeProducts: responseData?.general?.activeProducts || responseData?.activeProducts || 0,
+            lowStockProducts: responseData?.general?.lowStockProducts || responseData?.lowStockProducts || 0,
+            stockValue: responseData?.general?.stockValue || responseData?.stockValue || 0
+          },
+          movement: {
+            totalMovements: responseData?.movement?.totalMovements || responseData?.totalMovements || 0,
+            entriesCount: responseData?.movement?.entriesCount || responseData?.entriesCount || 0,
+            exitsCount: responseData?.movement?.exitsCount || responseData?.exitsCount || 0,
+            transfersCount: responseData?.movement?.transfersCount || responseData?.transfersCount || 0
+          },
+          topMovedProducts: responseData?.topMovedProducts || [],
+          stockByCategory: responseData?.stockByCategory || []
+        };
+
+        return extractedData;
+      }
+
+      return responseData;
     } catch (error) {
       console.error('Error al obtener estadísticas de inventario:', error);
       this.handleApiError(error);
@@ -157,23 +215,28 @@ class DashboardService {
   // Combina todas las estadísticas para el dashboard
   async getDashboardStats(): Promise<DashboardStats> {
     try {
+      console.log('Obteniendo estadísticas de dashboard...');
+
       // Intentamos obtener datos de productos, y si falla usamos datos simulados
-      const productsStats = await this.getProductStats().catch(error => {
-        console.warn('Usando datos simulados para productos:', error.message);
-        return this.getSimulatedProductStats();
-      });
+      const productsStats = await this.getProductStats()
+        .catch(error => {
+          console.warn('Usando datos simulados para productos:', error.message);
+          return this.getSimulatedProductStats();
+        });
 
       // Intentamos obtener datos de órdenes, y si falla usamos datos simulados
-      const ordersStats = await this.getOrderStats().catch(error => {
-        console.warn('Usando datos simulados para órdenes:', error.message);
-        return this.getSimulatedOrderStats();
-      });
+      const ordersStats = await this.getOrderStats()
+        .catch(error => {
+          console.warn('Usando datos simulados para órdenes:', error.message);
+          return this.getSimulatedOrderStats();
+        });
 
       // Intentamos obtener datos de inventario, y si falla usamos datos simulados
-      const inventoryStats = await this.getInventoryStats().catch(error => {
-        console.warn('Usando datos simulados para inventario:', error.message);
-        return this.getSimulatedInventoryStats();
-      });
+      const inventoryStats = await this.getInventoryStats()
+        .catch(error => {
+          console.warn('Usando datos simulados para inventario:', error.message);
+          return this.getSimulatedInventoryStats();
+        });
 
       return {
         products: productsStats,
@@ -182,7 +245,11 @@ class DashboardService {
       };
     } catch (error) {
       console.error('Error al obtener estadísticas del dashboard:', error);
-      throw error;
+      return {
+        products: this.getSimulatedProductStats(),
+        orders: this.getSimulatedOrderStats(),
+        inventory: this.getSimulatedInventoryStats()
+      };
     }
   }
 
@@ -274,33 +341,77 @@ class DashboardService {
     };
   }
 
-  private getSimulatedInventoryStats(): InventoryStats {
+  // Datos simulados para inventario
+  getSimulatedInventoryStats(): InventoryStats {
     return {
       general: {
-        totalProducts: 1250,
-        activeProducts: 980,
-        lowStockProducts: 120,
-        stockValue: 142500
+        totalProducts: 780,
+        activeProducts: 730,
+        lowStockProducts: 25,
+        stockValue: 145800
       },
       movement: {
         totalMovements: 320,
         entriesCount: 180,
-        exitsCount: 125,
-        transfersCount: 15
+        exitsCount: 140,
+        transfersCount: 0
       },
       topMovedProducts: [
-        { productId: '1', productName: 'Camiseta Básica', totalQuantity: 250, entriesCount: 150, exitsCount: 100 },
-        { productId: '2', productName: 'Pantalón Vaquero', totalQuantity: 180, entriesCount: 100, exitsCount: 80 },
-        { productId: '3', productName: 'Zapatillas Deportivas', totalQuantity: 150, entriesCount: 90, exitsCount: 60 },
-        { productId: '4', productName: 'Bolso de Mano', totalQuantity: 120, entriesCount: 70, exitsCount: 50 },
-        { productId: '5', productName: 'Gafas de Sol', totalQuantity: 100, entriesCount: 60, exitsCount: 40 }
+        {
+          productId: 'sim-1',
+          productName: 'Producto Simulado 1',
+          totalQuantity: 45,
+          entriesCount: 25,
+          exitsCount: 20
+        },
+        {
+          productId: 'sim-2',
+          productName: 'Producto Simulado 2',
+          totalQuantity: 38,
+          entriesCount: 22,
+          exitsCount: 16
+        },
+        {
+          productId: 'sim-3',
+          productName: 'Producto Simulado 3',
+          totalQuantity: 32,
+          entriesCount: 18,
+          exitsCount: 14
+        },
+        {
+          productId: 'sim-4',
+          productName: 'Producto Simulado 4',
+          totalQuantity: 28,
+          entriesCount: 16,
+          exitsCount: 12
+        },
+        {
+          productId: 'sim-5',
+          productName: 'Producto Simulado 5',
+          totalQuantity: 24,
+          entriesCount: 14,
+          exitsCount: 10
+        }
       ],
       stockByCategory: [
-        { category: 'Ropa', itemCount: 450, totalStock: 2250, totalValue: 56250 },
-        { category: 'Calzado', itemCount: 300, totalStock: 1500, totalValue: 37500 },
-        { category: 'Accesorios', itemCount: 250, totalStock: 1250, totalValue: 31250 },
-        { category: 'Deportes', itemCount: 150, totalStock: 750, totalValue: 18750 },
-        { category: 'Electrónica', itemCount: 100, totalStock: 500, totalValue: 12500 }
+        {
+          category: 'Electrónicos',
+          itemCount: 120,
+          totalStock: 450,
+          totalValue: 67500
+        },
+        {
+          category: 'Moda',
+          itemCount: 280,
+          totalStock: 840,
+          totalValue: 42000
+        },
+        {
+          category: 'Hogar',
+          itemCount: 220,
+          totalStock: 660,
+          totalValue: 36300
+        }
       ]
     };
   }

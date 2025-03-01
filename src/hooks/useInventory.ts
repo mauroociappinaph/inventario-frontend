@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useInventoryStore, Product } from '@/stores/inventoryStore';
-import axios from 'axios';
+import { useInventoryStore } from '@/stores/inventoryStore';
+import { Product } from '@/stores/inventoryTypes';
+import axios, { AxiosError } from 'axios';
 
 // Interfaces para tipado de estadísticas
 interface ProductStatistics {
@@ -114,7 +115,7 @@ export function useInventory() {
           return;
         }
 
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/inventory/stats`, {
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/inventory/statistics`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -127,7 +128,29 @@ export function useInventory() {
         }
       } catch (err) {
         console.error('Error al obtener estadísticas de inventario:', err);
-        setInventoryStatsError('No se pudieron cargar las estadísticas del servidor');
+
+        // Manejo de errores mejorado con detalles específicos
+        if (axios.isAxiosError(err)) {
+          const axiosError = err as AxiosError;
+          console.log("Detalles completos del error:", {
+            status: axiosError.response?.status,
+            data: axiosError.response?.data,
+            headers: axiosError.response?.headers,
+            url: axiosError.config?.url
+          });
+
+          if (axiosError.response?.status === 500) {
+            setInventoryStatsError(`Error interno del servidor: ${axiosError.message}`);
+          } else if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {
+            setInventoryStatsError('Error de autenticación: Sesión expirada o sin permisos');
+          } else if (axiosError.response?.status === 404) {
+            setInventoryStatsError('Endpoint no encontrado: La ruta de API solicitada no existe');
+          } else {
+            setInventoryStatsError(`Error en la solicitud: ${axiosError.message}`);
+          }
+        } else {
+          setInventoryStatsError(`No se pudieron cargar las estadísticas del servidor: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+        }
       } finally {
         setInventoryStatsLoading(false);
       }
