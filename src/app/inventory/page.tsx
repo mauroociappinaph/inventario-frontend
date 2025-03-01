@@ -1,521 +1,248 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { PageTransition } from '@/components/layout/page-transition'
+import { Skeleton } from '@/components/ui/skeleton-loader'
+import { LoadingState } from '@/components/ui/loading-state'
+import { useLoading } from '@/hooks/useLoading'
+import { useToast } from "@/components/ui/use-toast"
+import { useApiError } from "@/hooks/useApiError"
+import { ApiError } from "@/components/ui/api-error"
+import { ErrorMessage } from "@/components/ui/error-message"
+import inventoryService, { InventoryProduct } from "@/lib/api/inventory-service"
+import { PlusCircle, RefreshCw, AlertTriangle, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Package, Search, Plus, Edit, Trash2, ArrowUpDown, Filter } from "lucide-react"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select"
 
-// Define interfaces for type safety
-interface InventoryItem {
-  id: number;
-  name: string;
-  category: string;
-  quantity: number;
-  status: string;
-  supplier: string;
-  lastUpdated: string;
-  [key: string]: string | number; // Índice de firma para permitir acceso con índices de string
-}
-
-interface NewItemForm {
-  name: string;
-  category: string;
-  quantity: number;
-  supplier: string;
-}
-
-// Sample inventory data
-const initialInventory: InventoryItem[] = [
-  {
-    id: 1,
-    name: "Running Shoes",
-    category: "Footwear",
-    quantity: 45,
-    status: "In Stock",
-    supplier: "Nike Inc.",
-    lastUpdated: "2025-02-28",
-  },
-  {
-    id: 2,
-    name: "Baseball Cap",
-    category: "Accessories",
-    quantity: 32,
-    status: "In Stock",
-    supplier: "Adidas",
-    lastUpdated: "2025-02-27",
-  },
-  {
-    id: 3,
-    name: "Leather Boots",
-    category: "Footwear",
-    quantity: 12,
-    status: "Low Stock",
-    supplier: "Timberland",
-    lastUpdated: "2025-02-25",
-  },
-  {
-    id: 4,
-    name: "Winter Jacket",
-    category: "Clothing",
-    quantity: 8,
-    status: "Low Stock",
-    supplier: "North Face",
-    lastUpdated: "2025-02-20",
-  },
-  {
-    id: 5,
-    name: "Sunglasses",
-    category: "Accessories",
-    quantity: 0,
-    status: "Out of Stock",
-    supplier: "Ray-Ban",
-    lastUpdated: "2025-02-15",
-  },
-]
+// Datos de ejemplo para fallback cuando no hay conexión
+const mockInventoryData = [
+  { id: "1", name: "Laptop Dell XPS", sku: "LT-DL-001", stock: 12, price: 1299.99, category: "Electrónicos", supplier: "Dell Inc.", lastUpdated: "2023-06-15" },
+  { id: "2", name: "Monitor UltraWide", sku: "MN-UW-002", stock: 8, price: 349.99, category: "Electrónicos", supplier: "LG Electronics", lastUpdated: "2023-06-10" },
+  { id: "3", name: "Teclado Mecánico", sku: "KB-MC-003", stock: 15, price: 89.99, category: "Accesorios", supplier: "Logitech", lastUpdated: "2023-06-12" },
+  { id: "4", name: "Mouse Inalámbrico", sku: "MS-WL-004", stock: 24, price: 45.99, category: "Accesorios", supplier: "Logitech", lastUpdated: "2023-06-14" },
+  { id: "5", name: "Auriculares Bluetooth", sku: "HP-BT-005", stock: 18, price: 129.99, category: "Audio", supplier: "Sony", lastUpdated: "2023-06-11" }
+];
 
 export default function InventoryPage() {
-  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [sortField, setSortField] = useState<string>("name")
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
-  const [newItem, setNewItem] = useState<NewItemForm>({
-    name: "",
-    category: "",
-    quantity: 0,
-    supplier: "",
-  })
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
+  const [inventoryData, setInventoryData] = useState<InventoryProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const { startLoading, stopLoading } = useLoading();
+  const { toast } = useToast();
+  const { error, loading, executeRequest, resetError } = useApiError({
+    showToast: true,
+    defaultMessage: "No se pudieron cargar los productos del inventario"
+  });
 
-  // Filter and sort inventory
-  const filteredInventory = inventory
-    .filter((item) => {
-      const matchesSearch =
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.supplier.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesCategory = categoryFilter === "all" || item.category === categoryFilter
-      const matchesStatus = statusFilter === "all" || item.status === statusFilter
+  // Cargar datos del inventario
+  useEffect(() => {
+    const fetchInventory = async () => {
+      const result = await executeRequest(async () => {
+        // Intenta obtener datos del backend
+        return await inventoryService.getProducts();
+      });
 
-      return matchesSearch && matchesCategory && matchesStatus
-    })
-    .sort((a, b) => {
-      if (sortDirection === "asc") {
-        return a[sortField] > b[sortField] ? 1 : -1
+      if (result) {
+        setInventoryData(result);
       } else {
-        return a[sortField] < b[sortField] ? 1 : -1
+        // Si hay error, usar datos mock
+        setInventoryData(mockInventoryData);
       }
-    })
 
-  // Handle sorting
-  const handleSort = (field: string) => {
-    if (field === sortField) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortField(field)
-      setSortDirection("asc")
-    }
-  }
+      setIsLoading(false);
+    };
 
-  // Add new item
-  const handleAddItem = () => {
-    const status = newItem.quantity === 0 ? "Out of Stock" : newItem.quantity <= 15 ? "Low Stock" : "In Stock"
+    fetchInventory();
+  }, [executeRequest]);
 
-    const newItemWithDetails: InventoryItem = {
-      id: inventory.length + 1,
-      ...newItem,
-      status,
-      lastUpdated: new Date().toISOString().split("T")[0],
-    }
+  // Filtrar inventario por búsqueda y categoría
+  const filteredInventory = inventoryData.filter((item) => {
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
 
-    setInventory([...inventory, newItemWithDetails])
-    setNewItem({
-      name: "",
-      category: "",
-      quantity: 0,
-      supplier: "",
-    })
-  }
+    const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
 
-  // Update item
-  const handleUpdateItem = () => {
-    if (!editingItem) return
+    return matchesSearch && matchesCategory;
+  });
 
-    const status = editingItem.quantity === 0 ? "Out of Stock" : editingItem.quantity <= 15 ? "Low Stock" : "In Stock"
+  // Obtener categorías únicas para el filtro
+  const categories = Array.from(new Set(inventoryData.map(item => item.category)));
 
-    const updatedItem: InventoryItem = {
-      ...editingItem,
-      status,
-      lastUpdated: new Date().toISOString().split("T")[0],
+  // Función para refrescar datos
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    startLoading('refreshInventory');
+
+    const result = await executeRequest(async () => {
+      return await inventoryService.getProducts();
+    });
+
+    if (result) {
+      setInventoryData(result);
+      toast({
+        title: "Datos actualizados",
+        description: "El inventario se ha actualizado correctamente.",
+        variant: "success"
+      });
     }
 
-    setInventory(inventory.map((item) => (item.id === updatedItem.id ? updatedItem : item)))
-
-    setEditingItem(null)
-  }
-
-  // Delete item
-  const handleDeleteItem = (id: number) => {
-    setInventory(inventory.filter((item) => item.id !== id))
-  }
-
-  // Status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "In Stock":
-        return "bg-green-100 text-green-800"
-      case "Low Stock":
-        return "bg-yellow-100 text-yellow-800"
-      case "Out of Stock":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
+    setIsRefreshing(false);
+    stopLoading('refreshInventory');
+  };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="bg-white border-b shadow-sm">
-        <div className="container mx-auto py-4 px-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <h1 className="text-2xl font-bold text-[#4b3f72]">YOUR WEBSITE</h1>
-          </Link>
-          <nav className="hidden md:flex items-center gap-8">
-            <Link href="/" className="text-gray-500 hover:text-gray-700">
-              Home
-            </Link>
-            <Link href="/about" className="text-gray-500 hover:text-gray-700">
-              About us
-            </Link>
-            <Link href="/work" className="text-gray-500 hover:text-gray-700">
-              Work
-            </Link>
-            <Link href="/info" className="text-gray-500 hover:text-gray-700">
-              Info
-            </Link>
-            <Button className="bg-[#6c3ce9] hover:bg-[#5a30c5] text-white rounded-full px-6">Get Started</Button>
-          </nav>
-        </div>
-      </header>
-
-      <main className="flex-1 bg-gray-50">
-        <div className="container mx-auto py-8 px-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-[#4b3f72]">Inventory Management</h1>
-              <p className="text-gray-600">Manage and track your inventory items</p>
-            </div>
-
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="bg-[#6c3ce9] hover:bg-[#5a30c5] text-white">
-                  <Plus className="mr-2 h-4 w-4" /> Add New Item
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Inventory Item</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <label htmlFor="name">Item Name</label>
-                    <Input
-                      id="name"
-                      value={newItem.name}
-                      onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <label htmlFor="category">Category</label>
-                    <Select
-                      value={newItem.category}
-                      onValueChange={(value) => setNewItem({ ...newItem, category: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Footwear">Footwear</SelectItem>
-                        <SelectItem value="Clothing">Clothing</SelectItem>
-                        <SelectItem value="Accessories">Accessories</SelectItem>
-                        <SelectItem value="Electronics">Electronics</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <label htmlFor="quantity">Quantity</label>
-                    <Input
-                      id="quantity"
-                      type="number"
-                      min="0"
-                      value={newItem.quantity}
-                      onChange={(e) => setNewItem({ ...newItem, quantity: Number.parseInt(e.target.value) })}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <label htmlFor="supplier">Supplier</label>
-                    <Input
-                      id="supplier"
-                      value={newItem.supplier}
-                      onChange={(e) => setNewItem({ ...newItem, supplier: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
-                  </DialogClose>
-                  <DialogClose asChild>
-                    <Button
-                      className="bg-[#6c3ce9] hover:bg-[#5a30c5]"
-                      onClick={handleAddItem}
-                      disabled={!newItem.name || !newItem.category || !newItem.supplier}
-                    >
-                      Add Item
-                    </Button>
-                  </DialogClose>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+    <PageTransition transition={{ type: 'fade', duration: 0.3 }}>
+      <div className="container mx-auto p-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Gestión de Inventario</h1>
+            <p className="text-muted-foreground">Administra tus productos y consulta su disponibilidad</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="p-4 border-b">
-              <div className="flex flex-col md:flex-row gap-4 justify-between">
-                <div className="relative w-full md:w-96">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search items or suppliers..."
-                    className="pl-8"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center">
-                        <Filter className="mr-2 h-4 w-4" />
-                        <span>{categoryFilter || "All Categories"}</span>
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      <SelectItem value="Footwear">Footwear</SelectItem>
-                      <SelectItem value="Clothing">Clothing</SelectItem>
-                      <SelectItem value="Accessories">Accessories</SelectItem>
-                      <SelectItem value="Electronics">Electronics</SelectItem>
-                    </SelectContent>
-                  </Select>
+          <div className="flex gap-3">
+            <Button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
 
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center">
-                        <Filter className="mr-2 h-4 w-4" />
-                        <span>{statusFilter || "All Status"}</span>
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="In Stock">In Stock</SelectItem>
-                      <SelectItem value="Low Stock">Low Stock</SelectItem>
-                      <SelectItem value="Out of Stock">Out of Stock</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            <Button className="flex items-center gap-2">
+              <PlusCircle className="h-4 w-4" />
+              Añadir Producto
+            </Button>
+          </div>
+        </div>
+
+        {/* Filtros */}
+        <div className="bg-card rounded-lg p-4 mb-6 border border-border">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-grow">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Buscar por nombre, SKU o proveedor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full md:w-[200px]">
+                <SelectValue placeholder="Filtrar por categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las categorías</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Estado de error */}
+        {error && !isLoading && (
+          <div className="mb-6">
+            <ApiError
+              error={error}
+              resetError={resetError}
+              retry={handleRefresh}
+            />
+          </div>
+        )}
+
+        {/* Mensaje de fallback */}
+        {error && inventoryData === mockInventoryData && !isLoading && (
+          <div className="mb-6">
+            <ErrorMessage
+              title="Mostrando datos de ejemplo"
+              message="No se pudo conectar con el servidor. Mostrando datos de ejemplo de inventario."
+              severity="info"
+            />
+          </div>
+        )}
+
+        <div className="bg-card rounded-lg shadow-sm overflow-hidden border border-border">
+          <LoadingState
+            isLoading={isLoading}
+            fallbackType="skeleton"
+            skeleton={
+              <div className="p-4">
+                <Skeleton className="h-10 w-1/3 mb-6" />
+                <Skeleton variant="table-row" count={5} />
               </div>
+            }
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">ID</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Producto</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">SKU</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Stock</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Precio</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Categoría</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Proveedor</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredInventory.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                        {searchTerm || categoryFilter !== 'all'
+                          ? 'No se encontraron productos que coincidan con los filtros.'
+                          : 'No hay productos en el inventario.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredInventory.map((item) => (
+                      <tr key={item.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 text-sm">{item.id}</td>
+                        <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{item.sku}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            item.stock > 10 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                            item.stock > 5 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                            'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                          }`}>
+                            {item.stock} unidades
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm">${item.price.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm">{item.category}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{item.supplier}</td>
+                        <td className="px-4 py-3 text-sm text-right">
+                          <Button variant="ghost" size="sm">Editar</Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]">#</TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>
-                    <div className="flex items-center">
-                      Item Name
-                      {sortField === "name" && <ArrowUpDown className="ml-2 h-4 w-4" />}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("category")}>
-                    <div className="flex items-center">
-                      Category
-                      {sortField === "category" && <ArrowUpDown className="ml-2 h-4 w-4" />}
-                    </div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("quantity")}>
-                    <div className="flex items-center">
-                      Quantity
-                      {sortField === "quantity" && <ArrowUpDown className="ml-2 h-4 w-4" />}
-                    </div>
-                  </TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInventory.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      <Package className="mx-auto h-12 w-12 text-gray-300 mb-2" />
-                      No inventory items found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredInventory.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.id}</TableCell>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>{item.category}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
-                      </TableCell>
-                      <TableCell>{item.supplier}</TableCell>
-                      <TableCell>{item.lastUpdated}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="ghost" size="icon" onClick={() => setEditingItem({ ...item })}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Edit Inventory Item</DialogTitle>
-                              </DialogHeader>
-                              {editingItem && (
-                                <div className="grid gap-4 py-4">
-                                  <div className="grid gap-2">
-                                    <label htmlFor="edit-name">Item Name</label>
-                                    <Input
-                                      id="edit-name"
-                                      value={editingItem.name}
-                                      onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                                    />
-                                  </div>
-                                  <div className="grid gap-2">
-                                    <label htmlFor="edit-category">Category</label>
-                                    <Select
-                                      value={editingItem.category}
-                                      onValueChange={(value) => setEditingItem({ ...editingItem, category: value })}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select category" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="Footwear">Footwear</SelectItem>
-                                        <SelectItem value="Clothing">Clothing</SelectItem>
-                                        <SelectItem value="Accessories">Accessories</SelectItem>
-                                        <SelectItem value="Electronics">Electronics</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="grid gap-2">
-                                    <label htmlFor="edit-quantity">Quantity</label>
-                                    <Input
-                                      id="edit-quantity"
-                                      type="number"
-                                      min="0"
-                                      value={editingItem.quantity}
-                                      onChange={(e) =>
-                                        setEditingItem({ ...editingItem, quantity: Number.parseInt(e.target.value) })
-                                      }
-                                    />
-                                  </div>
-                                  <div className="grid gap-2">
-                                    <label htmlFor="edit-supplier">Supplier</label>
-                                    <Input
-                                      id="edit-supplier"
-                                      value={editingItem.supplier}
-                                      onChange={(e) => setEditingItem({ ...editingItem, supplier: e.target.value })}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                              <DialogFooter>
-                                <DialogClose asChild>
-                                  <Button variant="outline">Cancel</Button>
-                                </DialogClose>
-                                <DialogClose asChild>
-                                  <Button className="bg-[#6c3ce9] hover:bg-[#5a30c5]" onClick={handleUpdateItem}>
-                                    Update Item
-                                  </Button>
-                                </DialogClose>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Confirm Deletion</DialogTitle>
-                              </DialogHeader>
-                              <div className="py-4">
-                                <p>Are you sure you want to delete "{item.name}"? This action cannot be undone.</p>
-                              </div>
-                              <DialogFooter>
-                                <DialogClose asChild>
-                                  <Button variant="outline">Cancel</Button>
-                                </DialogClose>
-                                <DialogClose asChild>
-                                  <Button variant="destructive" onClick={() => handleDeleteItem(item.id)}>
-                                    Delete
-                                  </Button>
-                                </DialogClose>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          </LoadingState>
         </div>
-      </main>
-
-      <footer className="bg-[#4b3f72] text-white py-6">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <p>© 2025 Your Inventory System. All rights reserved.</p>
-            <div className="flex gap-4 mt-4 md:mt-0">
-              <Link href="#" className="hover:text-purple-200">
-                Terms
-              </Link>
-              <Link href="#" className="hover:text-purple-200">
-                Privacy
-              </Link>
-              <Link href="#" className="hover:text-purple-200">
-                Contact
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
-  )
+      </div>
+    </PageTransition>
+  );
 }
 

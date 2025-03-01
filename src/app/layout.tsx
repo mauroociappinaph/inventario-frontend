@@ -1,18 +1,15 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+import './globals.css';
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import { Providers } from './providers';
+import { Toaster } from '@/components/ui/toaster';
 
-import { ThemeProvider } from "@/providers/theme-provider";
-import { cn } from "@/lib/utils";
-import { NotificationProvider } from "@/contexts/notification-context";
-import { ToastProvider } from "@/components/ui/toast";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const inter = Inter({ subsets: ['latin'] });
 
 // Metadatos de la aplicación para SEO
 export const metadata: Metadata = {
-  title: "InvSystem",
-  description: "Sistema de gestión de inventario",
+  title: 'Gestión de Inventario',
+  description: 'Sistema de gestión de inventario corporativo',
 };
 
 export default function RootLayout({
@@ -21,18 +18,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es" suppressHydrationWarning className="light">
-      <body
-        className={cn('min-h-screen font-sans antialiased', inter.variable)}
-        suppressHydrationWarning
-      >
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          <ToastProvider>
-            <NotificationProvider>
-              {children}
-            </NotificationProvider>
-          </ToastProvider>
-        </ThemeProvider>
+    <html lang="es">
+      <body className={inter.className}>
+        <Providers>
+          {children}
+          <Toaster />
+        </Providers>
       </body>
     </html>
   );

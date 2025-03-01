@@ -27,8 +27,8 @@ export interface User {
 }
 
 export interface AuthResponse {
-  access_token: string;
-  user: User;
+  token: string;
+  user?: User;
 }
 
 // Tiempo de expiración de la cookie en días (7 días por defecto)
@@ -43,13 +43,17 @@ const authService = {
       const data = response.data;
 
       // Guardar el token en localStorage y cookies
-      if (data.access_token) {
+      if (data.token) {
         // Guardar en localStorage
-        localStorage.setItem('auth_token', data.access_token);
-        localStorage.setItem('user_data', JSON.stringify(data.user));
+        localStorage.setItem('auth_token', data.token);
+
+        // Si hay datos de usuario, guardarlos también
+        if (data.user) {
+          localStorage.setItem('user_data', JSON.stringify(data.user));
+        }
 
         // Guardar en cookies para que sea accesible por el middleware
-        Cookies.set('auth_token', data.access_token, {
+        Cookies.set('auth_token', data.token, {
           expires: COOKIE_EXPIRY_DAYS,
           path: '/',
           sameSite: 'strict'
@@ -70,13 +74,17 @@ const authService = {
       const data = response.data;
 
       // Guardar el token en localStorage y cookies
-      if (data.access_token) {
+      if (data.token) {
         // Guardar en localStorage
-        localStorage.setItem('auth_token', data.access_token);
-        localStorage.setItem('user_data', JSON.stringify(data.user));
+        localStorage.setItem('auth_token', data.token);
+
+        // Si hay datos de usuario, guardarlos también
+        if (data.user) {
+          localStorage.setItem('user_data', JSON.stringify(data.user));
+        }
 
         // Guardar en cookies
-        Cookies.set('auth_token', data.access_token, {
+        Cookies.set('auth_token', data.token, {
           expires: COOKIE_EXPIRY_DAYS,
           path: '/',
           sameSite: 'strict'
