@@ -1,6 +1,18 @@
 /** @type {import('next').NextConfig} */
+
+// Importar aquí para evitar problemas con async/await o require
+let BundleAnalyzerPlugin;
+try {
+  // Evitar errores si webpack-bundle-analyzer no está instalado
+  BundleAnalyzerPlugin =
+    require("webpack-bundle-analyzer").BundleAnalyzerPlugin;
+} catch (e) {
+  // Silenciar error
+  console.log(e);
+}
+
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false,
   eslint: {
     // Permite producción con advertencias de ESLint
     ignoreDuringBuilds: true,
@@ -16,13 +28,35 @@ const nextConfig = {
   },
   // Añadir configuración de imágenes
   images: {
-    domains: [
-      "localhost",
-      "placeholders.dev",
-      "placehold.co",
-      "via.placeholder.com",
-      "random.imagecdn.app",
-      "picsum.photos",
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "localhost",
+      },
+      {
+        protocol: "https",
+        hostname: "placeholders.dev",
+      },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
+      },
+      {
+        protocol: "https",
+        hostname: "via.placeholder.com",
+      },
+      {
+        protocol: "https",
+        hostname: "random.imagecdn.app",
+      },
+      {
+        protocol: "https",
+        hostname: "picsum.photos",
+      },
+      {
+        protocol: "https",
+        hostname: "**.vercel-storage.com",
+      },
     ],
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
@@ -43,30 +77,18 @@ const nextConfig = {
     // número de páginas que se mantendrán en memoria
     pagesBufferLength: 5,
   },
-  // Optimización de código
 
   // Medir tamaño de bundles para optimización
-  webpack: async (config, { isServer }) => {
+  webpack: (config, { isServer }) => {
     // Asegurarse de que el analizador de bundle solo se carga si está instalado
-    if (process.env.ANALYZE === "true") {
-      try {
-        // Usar import dinámico para evitar el uso de require
-        const { BundleAnalyzerPlugin } = await import(
-          "webpack-bundle-analyzer"
-        );
-        config.plugins.push(
-          new BundleAnalyzerPlugin({
-            analyzerMode: "server",
-            analyzerPort: isServer ? 8888 : 8889,
-            openAnalyzer: true,
-          })
-        );
-      } catch (error) {
-        console.error(error);
-        console.warn(
-          "webpack-bundle-analyzer no está disponible. Instálalo con: npm install --save-dev webpack-bundle-analyzer"
-        );
-      }
+    if (process.env.ANALYZE === "true" && BundleAnalyzerPlugin) {
+      config.plugins.push(
+        new BundleAnalyzerPlugin({
+          analyzerMode: "server",
+          analyzerPort: isServer ? 8888 : 8889,
+          openAnalyzer: true,
+        })
+      );
     }
 
     return config;

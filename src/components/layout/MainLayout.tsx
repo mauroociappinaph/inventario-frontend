@@ -4,7 +4,8 @@ import { useState, useEffect, ReactNode } from "react"
 import { useTheme } from "next-themes"
 import { Header } from "./header/Header"
 import { EnhancedSidebar } from "./sidebar/EnhancedSidebar"
-import { SidebarItem } from "../types/sidebar"
+import { SidebarItem, SidebarSection } from "./sidebar/EnhancedSidebar"
+import { UIStateProvider } from "@/providers/ui-state-provider"
 
 interface User {
   name: string
@@ -14,9 +15,7 @@ interface User {
 
 interface MainLayoutProps {
   children: ReactNode
-  sidebarSections: {
-    items: SidebarItem[]
-  }[]
+  sidebarSections: SidebarSection[]
   user?: User
   logo: ReactNode
   activeItemId?: string
@@ -34,9 +33,6 @@ export function MainLayout({
   // Estados para el tema
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-
-  // Estado para controlar si el menú móvil está abierto
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Estado para el tamaño de la ventana
   const [isMobile, setIsMobile] = useState(false)
@@ -66,16 +62,13 @@ export function MainLayout({
 
   // Alternar menú móvil
   const toggleMobileMenu = () => {
-    setMobileMenuOpen(prev => !prev)
+    // Esta función se pasa a Header pero no necesita mantener estado
+    // ya que la navegación móvil se maneja de otra manera
   }
 
   // Ocultar el menú móvil cuando se hace clic en un ítem (en móvil)
   const handleSidebarItemClick = (item: SidebarItem) => {
-    if (isMobile) {
-      setMobileMenuOpen(false)
-    }
-
-    if (onSidebarItemClick) {
+    if (isMobile && onSidebarItemClick) {
       onSidebarItemClick(item)
     }
   }
@@ -84,49 +77,26 @@ export function MainLayout({
   if (!mounted) return null
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-background text-foreground">
-      {/* Sidebar - oculto en móvil a menos que se active */}
-      <div className={`
-        fixed inset-0 z-50 md:relative
-        ${mobileMenuOpen ? "block" : "hidden"}
-        md:block
-      `}>
-        {/* Overlay para cerrar al hacer clic fuera (solo en móvil) */}
-        {mobileMenuOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 md:hidden"
-            onClick={toggleMobileMenu}
-            aria-hidden="true"
-          />
-        )}
-
-        <EnhancedSidebar
-          logo={logo}
-          sidebarSections={sidebarSections}
-          activeItemId={activeItemId}
-          defaultCollapsed={false}
-          onItemClick={handleSidebarItemClick}
-          className="z-10 relative h-full md:h-screen"
-        />
-      </div>
-
-      {/* Contenido principal */}
-      <div className="flex-1 flex flex-col min-h-screen max-w-full">
+    <UIStateProvider>
+      <div className="relative flex min-h-screen flex-col">
         <Header
           user={user}
           onMobileMenuToggle={toggleMobileMenu}
           isDarkTheme={theme === "dark"}
           onThemeToggle={toggleTheme}
         />
-
-        <main className="flex-1 p-4 md:p-6 overflow-auto">
-          {children}
-        </main>
-
-        <footer className="py-2 px-4 text-center text-xs text-muted-foreground border-t border-border">
-          <p>© {new Date().getFullYear()} InvSystem. Todos los derechos reservados.</p>
-        </footer>
+        <div className="flex flex-1">
+          <EnhancedSidebar
+            sidebarSections={sidebarSections}
+            activeItemId={activeItemId}
+            onItemClick={handleSidebarItemClick}
+            logo={logo}
+          />
+          <main className="flex-1 p-4 md:p-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </UIStateProvider>
   )
 }

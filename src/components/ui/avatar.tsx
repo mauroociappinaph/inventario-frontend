@@ -6,8 +6,9 @@ import { Skeleton } from './skeleton';
 import { cn } from '@/lib/utils';
 import { useTypeGuards } from '@/hooks/useTypeGuards';
 import { useEfficiencyOptimizations } from '@/hooks/useEfficiencyOptimizations';
+import * as AvatarPrimitive from "@radix-ui/react-avatar"
 
-interface AvatarProps {
+interface CustomAvatarProps {
   src?: string | null;
   alt?: string;
   size?: ImageSize;
@@ -51,7 +52,7 @@ const getInitials = (text?: string, isEmail?: (value: string) => boolean): strin
  * - Indicador de estado opcional
  * - Skeleton durante la carga
  */
-export const Avatar: React.FC<AvatarProps> = ({
+const CustomAvatar: React.FC<CustomAvatarProps> = ({
   src,
   alt,
   size = 'md',
@@ -203,3 +204,47 @@ export const Avatar: React.FC<AvatarProps> = ({
     </div>
   );
 };
+
+const Avatar = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Root
+    ref={ref}
+    className={cn(
+      "relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full",
+      className
+    )}
+    {...props}
+  />
+))
+Avatar.displayName = AvatarPrimitive.Root.displayName
+
+const AvatarImage = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Image>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Image
+    ref={ref}
+    className={cn("aspect-square h-full w-full", className)}
+    {...props}
+  />
+))
+AvatarImage.displayName = AvatarPrimitive.Image.displayName
+
+const AvatarFallback = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Fallback>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Fallback
+    ref={ref}
+    className={cn(
+      "flex h-full w-full items-center justify-center rounded-full bg-muted",
+      className
+    )}
+    {...props}
+  />
+))
+AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName
+
+export { Avatar, AvatarImage, AvatarFallback, CustomAvatar }
