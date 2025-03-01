@@ -25,6 +25,8 @@ module.exports = {
         primary: {
           DEFAULT: "#6d4a5c",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--primary-hover))",
+          active: "hsl(var(--primary-active))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -50,6 +52,15 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        "chart-1": {
+          DEFAULT: "var(--chart-1)",
+        },
+        "chart-2": {
+          DEFAULT: "var(--chart-2)",
+        },
+      },
+      borderColor: {
+        border: "hsl(var(--border))",
       },
       borderRadius: {
         lg: "var(--radius)",
