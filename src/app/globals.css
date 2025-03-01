@@ -3,82 +3,84 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
+  /* Modo claro - Paleta Sky */
+  --background: 204 100% 97%; /* sky-50 */
+  --foreground: 212 100% 25%; /* sky-900 */
 
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
+  --card: 204 100% 97%; /* sky-50 */
+  --card-foreground: 212 100% 25%; /* sky-900 */
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
+  --popover: 204 100% 97%; /* sky-50 */
+  --popover-foreground: 212 100% 25%; /* sky-900 */
 
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
+  --primary: 203 83% 36%; /* sky-700 */
+  --primary-foreground: 204 100% 97%; /* sky-50 */
 
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
+  --secondary: 202 80% 85%; /* sky-200 */
+  --secondary-foreground: 203 83% 36%; /* sky-700 */
 
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
+  --muted: 201 94% 86%; /* sky-100 */
+  --muted-foreground: 203 87% 25%; /* sky-800 */
 
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
+  --accent: 202 80% 76%; /* sky-300 */
+  --accent-foreground: 203 87% 25%; /* sky-800 */
 
   --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive-foreground: 204 100% 97%; /* sky-50 */
 
   --success: 142 76% 36%;
-  --success-foreground: 0 0% 98%;
+  --success-foreground: 204 100% 97%; /* sky-50 */
 
   --warning: 38 92% 50%;
-  --warning-foreground: 240 5.9% 10%;
+  --warning-foreground: 204 100% 97%; /* sky-50 */
 
-  --info: 217 91% 60%;
-  --info-foreground: 0 0% 98%;
+  --info: 201 94% 86%; /* sky-100 */
+  --info-foreground: 212 100% 25%; /* sky-900 */
 
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 10% 3.9%;
+  --border: 202 80% 85%; /* sky-200 */
+  --input: 202 80% 85%; /* sky-200 */
+  --ring: 204 96% 53%; /* sky-500 */
   --radius: 0.5rem;
 }
 
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
+  /* Modo oscuro - Paleta Sky */
+  --background: 217 91% 15%; /* sky-950 */
+  --foreground: 201 94% 86%; /* sky-100 */
 
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
+  --card: 214 100% 20%; /* sky-900 */
+  --card-foreground: 201 94% 86%; /* sky-100 */
 
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
+  --popover: 214 100% 20%; /* sky-900 */
+  --popover-foreground: 201 94% 86%; /* sky-100 */
 
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
+  --primary: 204 96% 71%; /* sky-400 */
+  --primary-foreground: 215 100% 30%; /* sky-800 */
 
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
+  --secondary: 204 100% 40%; /* sky-600 */
+  --secondary-foreground: 201 94% 86%; /* sky-100 */
 
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
+  --muted: 217 91% 15%; /* sky-950 */
+  --muted-foreground: 202 80% 76%; /* sky-300 */
 
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
+  --accent: 204 100% 40%; /* sky-600 */
+  --accent-foreground: 201 94% 86%; /* sky-100 */
 
   --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive-foreground: 201 94% 86%; /* sky-100 */
 
   --success: 142 76% 29%;
-  --success-foreground: 0 0% 98%;
+  --success-foreground: 201 94% 86%; /* sky-100 */
 
   --warning: 38 92% 48%;
-  --warning-foreground: 240 5.9% 10%;
+  --warning-foreground: 201 94% 86%; /* sky-100 */
 
-  --info: 217 91% 52%;
-  --info-foreground: 0 0% 98%;
+  --info: 204 96% 71%; /* sky-400 */
+  --info-foreground: 215 100% 30%; /* sky-800 */
 
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
+  --border: 204 100% 40%; /* sky-600 */
+  --input: 204 100% 40%; /* sky-600 */
+  --ring: 204 96% 71%; /* sky-400 */
 }
 
 * {

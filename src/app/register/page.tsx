@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import authService from '@/lib/api/auth-service';
@@ -9,296 +9,338 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import axios from 'axios';
-
-// Patrones de validación (los mismos que en el backend)
-const VALIDATION_PATTERNS = {
-  password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/,
-  phone: /^\+?[0-9]{8,15}$/,
-  email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
-};
-
-// Mensajes de error por campo
-const ERROR_MESSAGES = {
-  name: 'El nombre debe tener entre 2 y 100 caracteres',
-  email: 'El email debe tener un formato válido',
-  password: 'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número',
-  companyName: 'El nombre de la empresa debe tener entre 2 y 100 caracteres',
-  initials: 'Las iniciales deben tener entre 2 y 4 caracteres',
-  phone: 'El teléfono debe tener formato +XXXXXXXXXX (entre 8 y 15 dígitos)'
-};
+import { Eye, EyeOff, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import SuccessModal from '@/components/ui/success-modal';
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    companyName: '',
-    initials: '',
-    phone: ''
-  });
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isValid, setIsValid] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const router = useRouter();
 
-  // Validar el formulario cada vez que cambian los datos
-  useEffect(() => {
-    validateForm();
-  }, [formData]);
+  // Validaciones de contraseña
+  const hasMinLength = password.length >= 6;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  const passwordsMatch = password === passwordConfirm;
+  const isPasswordValid = hasMinLength && hasUppercase && hasLowercase && (hasNumber || hasSpecial);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    // Validar nombre
-    if (formData.name && (formData.name.length < 2 || formData.name.length > 100)) {
-      newErrors.name = ERROR_MESSAGES.name;
-    }
-
-    // Validar email
-    if (formData.email && !VALIDATION_PATTERNS.email.test(formData.email)) {
-      newErrors.email = ERROR_MESSAGES.email;
-    }
-
-    // Validar contraseña
-    if (formData.password && !VALIDATION_PATTERNS.password.test(formData.password)) {
-      newErrors.password = ERROR_MESSAGES.password;
-    }
-
-    // Validar nombre de empresa
-    if (formData.companyName && (formData.companyName.length < 2 || formData.companyName.length > 100)) {
-      newErrors.companyName = ERROR_MESSAGES.companyName;
-    }
-
-    // Validar iniciales (opcional)
-    if (formData.initials && (formData.initials.length < 2 || formData.initials.length > 4)) {
-      newErrors.initials = ERROR_MESSAGES.initials;
-    }
-
-    // Validar teléfono (opcional)
-    if (formData.phone && !VALIDATION_PATTERNS.phone.test(formData.phone)) {
-      newErrors.phone = ERROR_MESSAGES.phone;
-    }
-
-    setErrors(newErrors);
-
-    // Determinar si el formulario es válido
-    const requiredFieldsFilled = Boolean(formData.name && formData.email &&
-                              formData.password && formData.companyName);
-    setIsValid(requiredFieldsFilled && Object.keys(newErrors).length === 0);
+  const handleRedirectToLogin = () => {
+    router.push('/login');
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    // Limpiar el mensaje de error global cuando el usuario realiza cambios
-    setErrorMsg(null);
+  // Actualizar estado para mostrar u ocultar requisitos de contraseña
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPassword = e.target.value;
+    setPassword(newPassword);
+
+    // Mostrar requisitos solo si hay algo escrito en el campo y la contraseña no es válida
+    if (newPassword && !isPasswordValid) {
+      setShowPasswordRequirements(true);
+    } else if (isPasswordValid && !attemptedSubmit) {
+      // Si la contraseña es válida y no ha habido intentos de envío fallidos, ocultamos los requisitos
+      setShowPasswordRequirements(false);
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-
-    // Validar una última vez antes de enviar
-    validateForm();
-    if (!isValid) {
-      const errorMessages = Object.values(errors).join(', ');
-      setErrorMsg(`Por favor corrige los siguientes errores: ${errorMessages}`);
-      toast.error('Hay errores en el formulario');
-      return;
-    }
-
+    setAttemptedSubmit(true);
     setIsLoading(true);
-    setErrorMsg(null);
-
-    // Depuración - muestra exactamente qué se está enviando al backend
-    console.log('Enviando datos al backend:', JSON.stringify(formData, null, 2));
+    setError(null);
 
     try {
-      await authService.register(formData);
-      toast.success('Registro exitoso');
-      router.push('/dashboard'); // Redirigir al dashboard después del registro
-    } catch (error) {
-      console.error('Error completo:', error);
-
-      if (axios.isAxiosError(error) && error.response) {
-        // Mostrar detalles específicos del error del backend
-        const serverError = error.response.data;
-        console.log('Respuesta del servidor:', serverError);
-
-        let message = 'Error al registrar usuario';
-
-        if (serverError.message) {
-          if (Array.isArray(serverError.message)) {
-            // Para errores de validación que devuelven un array de mensajes
-            message = serverError.message.join(', ');
-          } else {
-            message = serverError.message;
-          }
-        }
-
-        setErrorMsg(message);
-        toast.error(message);
-      } else {
-        const errorMessage = error instanceof Error
-          ? error.message
-          : 'Error al registrar usuario';
-        setErrorMsg(errorMessage);
-        toast.error(errorMessage);
+      // Verificar si todos los campos requeridos están completos
+      if (!name || !email || !password || !companyName) {
+        setError('Por favor completa todos los campos obligatorios');
+        toast.error('Por favor completa todos los campos obligatorios');
+        setIsLoading(false);
+        return;
       }
+
+      // Verificar que la contraseña cumpla con los requisitos
+      if (!isPasswordValid) {
+        setError('La contraseña no cumple con los requisitos mínimos');
+        toast.error('La contraseña no cumple con los requisitos mínimos');
+        setShowPasswordRequirements(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Verificar que las contraseñas coincidan
+      if (!passwordsMatch) {
+        setError('Las contraseñas no coinciden');
+        toast.error('Las contraseñas no coinciden');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Iniciando registro de usuario:', { name, email, companyName });
+
+      // Registrar los datos que se envían (sin mostrar la contraseña completa)
+      const registerData = {
+        name,
+        email,
+        password: password.substring(0, 2) + '****', // Solo para depuración
+        companyName
+      };
+      console.log('Datos de registro:', registerData);
+
+      await authService.register({
+        name,
+        email,
+        password,
+        companyName
+      });
+
+      console.log('Registro completado exitosamente');
+
+      // Mostrar el modal de éxito en lugar de redireccionar inmediatamente
+      setShowSuccessModal(true);
+    } catch (error: unknown) {
+      console.error('Error completo de registro:', error);
+      let errorMessage = 'Error al registrar usuario';
+
+      // Intentar extraer mensaje de error específico
+      if (typeof error === 'object' && error !== null) {
+        const err = error as any;
+        console.log('Estructura del error:', {
+          response: err.response?.data,
+          status: err.response?.status,
+          message: err.message
+        });
+
+        if (err.response?.data?.message) {
+          if (Array.isArray(err.response.data.message)) {
+            errorMessage = err.response.data.message[0];
+          } else {
+            errorMessage = err.response.data.message;
+          }
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+      }
+
+      console.error('Mensaje de error final:', errorMessage);
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-lg p-8">
-        <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Crear cuenta</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Registra tus datos para comenzar a utilizar el sistema
+    <>
+      <div className="grid min-h-svh place-items-center bg-background p-4">
+        <div className="w-full max-w-md">
+          <div className="space-y-2 text-center mb-6">
+            <h1 className="text-4xl font-bold">Crear nueva cuenta</h1>
+            <p className="text-muted-foreground">Completa el formulario para registrarte en InvSystem</p>
+          </div>
+          <Card>
+            <form onSubmit={handleSubmit} className="space-y-4 p-6">
+              {error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 rounded-md flex items-start gap-2 text-sm text-red-600 dark:text-red-400">
+                  <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                  <div>{error}</div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="name">Nombre Completo *</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Juan Pérez"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className={error && !name ? "border-red-300 dark:border-red-700" : ""}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="ejemplo@empresa.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className={error && !email ? "border-red-300 dark:border-red-700" : ""}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Nombre de la Empresa *</Label>
+                <Input
+                  id="companyName"
+                  type="text"
+                  placeholder="Mi Empresa S.A."
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  required
+                  className={error && !companyName ? "border-red-300 dark:border-red-700" : ""}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">
+                  Contraseña *
+                  {!showPasswordRequirements && !isPasswordValid && password && (
+                    <span
+                      className="text-xs ml-2 text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      onClick={() => setShowPasswordRequirements(true)}
+                    >
+                      Ver requisitos
+                    </span>
+                  )}
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={handlePasswordChange}
+                    required
+                    className={error && !isPasswordValid ? "border-red-300 dark:border-red-700" : ""}
+                    onFocus={() => {
+                      // Mostrar requisitos al hacer focus si la contraseña no es válida
+                      if (password && !isPasswordValid) {
+                        setShowPasswordRequirements(true);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    onClick={togglePasswordVisibility}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+                {(showPasswordRequirements || (attemptedSubmit && !isPasswordValid)) && (
+                  <div className="space-y-1 mt-2 text-xs">
+                    <p className="font-medium text-muted-foreground">La contraseña debe contener:</p>
+                    <div className="flex items-center gap-2">
+                      {hasMinLength ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
+                      <span className={hasMinLength ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                        Al menos 6 caracteres
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hasUppercase ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
+                      <span className={hasUppercase ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                        Al menos una letra mayúscula
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hasLowercase ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
+                      <span className={hasLowercase ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                        Al menos una letra minúscula
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hasNumber || hasSpecial ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
+                      <span className={hasNumber || hasSpecial ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                        Al menos un número o carácter especial
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="passwordConfirm">Confirmar Contraseña *</Label>
+                <div className="relative">
+                  <Input
+                    id="passwordConfirm"
+                    type={showPassword ? "text" : "password"}
+                    value={passwordConfirm}
+                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                    required
+                    className={error && passwordConfirm && !passwordsMatch ? "border-red-300 dark:border-red-700" : ""}
+                  />
+                </div>
+                {passwordConfirm && !passwordsMatch && (
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                    <XCircle className="h-4 w-4" />
+                    Las contraseñas no coinciden
+                  </p>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Registrando..." : "Crear cuenta"}
+              </Button>
+
+              <p className="text-center text-sm text-muted-foreground">
+                ¿Ya tienes una cuenta?{" "}
+                <Link href="/login" className="font-medium text-primary underline-offset-4 hover:underline">
+                  Iniciar sesión
+                </Link>
+              </p>
+            </form>
+          </Card>
+
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            Al registrarte, aceptas nuestros{" "}
+            <Link href="/terms" className="underline underline-offset-4 hover:text-primary">
+              Términos de Servicio
+            </Link>{" "}
+            y{" "}
+            <Link href="/privacy" className="underline underline-offset-4 hover:text-primary">
+              Política de Privacidad
+            </Link>
+            .
           </p>
         </div>
+      </div>
 
-        {errorMsg && (
-          <div className="mb-4 rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error de registro:</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  {errorMsg}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nombre completo</Label>
-              <Input
-                id="name"
-                name="name"
-                placeholder="Juan Pérez"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-                className={errors.name ? 'border-red-500' : ''}
-              />
-              {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Correo electrónico</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="correo@ejemplo.com"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-                className={errors.email ? 'border-red-500' : ''}
-              />
-              {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="********"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              disabled={isLoading}
-              className={errors.password ? 'border-red-500' : ''}
-            />
-            <p className="text-xs text-gray-500">
-              La contraseña debe tener al menos 8 caracteres, una letra mayúscula, una minúscula y un número.
-            </p>
-            {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="companyName">Nombre de la empresa</Label>
-            <Input
-              id="companyName"
-              name="companyName"
-              placeholder="Tu Empresa S.A."
-              value={formData.companyName}
-              onChange={handleChange}
-              required
-              disabled={isLoading}
-              className={errors.companyName ? 'border-red-500' : ''}
-            />
-            {errors.companyName && <p className="text-xs text-red-500">{errors.companyName}</p>}
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="initials">Iniciales (opcional)</Label>
-              <Input
-                id="initials"
-                name="initials"
-                placeholder="TE"
-                value={formData.initials}
-                onChange={handleChange}
-                maxLength={4}
-                disabled={isLoading}
-                className={errors.initials ? 'border-red-500' : ''}
-              />
-              {errors.initials && <p className="text-xs text-red-500">{errors.initials}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">Teléfono (opcional)</Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                placeholder="+12345678900"
-                value={formData.phone}
-                onChange={handleChange}
-                disabled={isLoading}
-                className={errors.phone ? 'border-red-500' : ''}
-              />
-              <p className="text-xs text-gray-500">
-                Formato: +12345678900 (con código de país)
-              </p>
-              {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
-            </div>
-          </div>
-
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Registrando...' : 'Registrarse'}
-          </Button>
-
-          <div className="mt-4 text-center text-sm">
-            ¿Ya tienes una cuenta?{' '}
-            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
-              Iniciar sesión
-            </Link>
-          </div>
-        </form>
-      </Card>
-    </div>
+      {/* Modal de registro exitoso */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        title="¡Bienvenido a InvSystem!"
+        message={`${name}, tu cuenta ha sido creada exitosamente. Ahora puedes iniciar sesión con tus credenciales.`}
+        redirectText="Ir a iniciar sesión"
+        onRedirect={handleRedirectToLogin}
+      />
+    </>
   );
 }

@@ -1,71 +1,60 @@
+"use client"
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-export interface LoadingSpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
+interface LoadingSpinnerProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info';
+  variant?: 'primary' | 'secondary' | 'white';
   label?: string;
   showLabel?: boolean;
-  centered?: boolean;
-  fullscreen?: boolean;
+  className?: string;
+  labelClassName?: string;
 }
-
-const sizeClasses = {
-  xs: 'w-4 h-4 border-2',
-  sm: 'w-6 h-6 border-2',
-  md: 'w-8 h-8 border-2',
-  lg: 'w-12 h-12 border-3',
-  xl: 'w-16 h-16 border-4',
-};
-
-const variantClasses = {
-  primary: 'border-primary border-t-transparent',
-  secondary: 'border-secondary border-t-transparent',
-  success: 'border-green-500 border-t-transparent',
-  danger: 'border-red-500 border-t-transparent',
-  warning: 'border-yellow-500 border-t-transparent',
-  info: 'border-blue-500 border-t-transparent',
-};
 
 export function LoadingSpinner({
   size = 'md',
   variant = 'primary',
   label = 'Cargando...',
   showLabel = false,
-  centered = false,
-  fullscreen = false,
   className,
-  ...props
+  labelClassName
 }: LoadingSpinnerProps) {
-  const containerClasses = cn(
-    'flex flex-col items-center justify-center',
-    fullscreen && 'fixed inset-0 bg-background/80 backdrop-blur-sm z-50',
-    centered && 'w-full h-full',
-    className
-  );
+  // Determinar el tamaño del spinner
+  const sizeClasses = {
+    xs: 'h-3 w-3 border-[2px]',
+    sm: 'h-4 w-4 border-[2px]',
+    md: 'h-6 w-6 border-[3px]',
+    lg: 'h-8 w-8 border-[3px]',
+    xl: 'h-12 w-12 border-[4px]'
+  };
 
-  const spinnerClasses = cn(
-    'animate-spin rounded-full',
-    sizeClasses[size],
-    variantClasses[variant]
-  );
-
-  const labelClasses = cn(
-    'mt-2 text-sm font-medium',
-    {
-      'text-primary': variant === 'primary',
-      'text-secondary': variant === 'secondary',
-      'text-green-500': variant === 'success',
-      'text-red-500': variant === 'danger',
-      'text-yellow-500': variant === 'warning',
-      'text-blue-500': variant === 'info',
-    }
-  );
+  // Determinar colores según la variante
+  const variantClasses = {
+    primary: 'border-sky-200 border-t-sky-600 dark:border-sky-700 dark:border-t-sky-400',
+    secondary: 'border-sky-100 border-t-sky-300 dark:border-sky-800 dark:border-t-sky-600',
+    white: 'border-white/40 border-t-white'
+  };
 
   return (
-    <div className={containerClasses} {...props}>
-      <div className={spinnerClasses} />
-      {showLabel && <span className={labelClasses}>{label}</span>}
+    <div className={cn('flex flex-col items-center justify-center gap-3', className)}>
+      <div
+        className={cn(
+          'animate-spin rounded-full',
+          sizeClasses[size],
+          variantClasses[variant]
+        )}
+      />
+      {showLabel && (
+        <span
+          className={cn(
+            'text-sm font-medium text-sky-700 dark:text-sky-300',
+            labelClassName
+          )}
+        >
+          {label}
+        </span>
+      )}
     </div>
   );
 }

@@ -9,29 +9,56 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
     try {
+      // Verificar si hay información mínima
+      if (!email || !password) {
+        setError('Por favor completa todos los campos');
+        toast.error('Por favor completa todos los campos');
+        setIsLoading(false);
+        return;
+      }
+
       await authService.login({ email, password });
       toast.success('Inicio de sesión exitoso');
-      router.push('/dashboard'); // Redirigir al dashboard después del login
+      router.push('/'); // Redirigir a la página principal después del login
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'Error al iniciar sesión';
+      console.error('Error de inicio de sesión:', error);
+      let errorMessage = 'Error al iniciar sesión';
+
+      // Intentar extraer mensaje de error específico
+      if (typeof error === 'object' && error !== null) {
+        const err = error as any;
+        if (err.response?.data?.message) {
+          errorMessage = err.response.data.message;
+        } else if (err.message) {
+          errorMessage = err.message;
+        }
+      }
+
+      setError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
@@ -43,6 +70,12 @@ export default function LoginPage() {
         </div>
         <Card>
           <form onSubmit={handleSubmit} className="space-y-4 p-6">
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 rounded-md flex items-start gap-2 text-sm text-red-600 dark:text-red-400">
+                <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                <div>{error}</div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="" htmlFor="email">Email</Label>
               <Input
@@ -52,6 +85,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className={error ? "border-red-300 dark:border-red-700" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -64,21 +98,45 @@ export default function LoginPage() {
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className={error ? "border-red-300 dark:border-red-700" : ""}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                  onClick={togglePasswordVisibility}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
             </Button>
+
+            <div className="text-center text-sm text-muted-foreground">
+              <p>¿No tienes usuario? Solicita a un administrador que cree una cuenta para ti, o</p>
+              <Link
+                href="/register"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Regístrate ahora
+              </Link>
+            </div>
           </form>
         </Card>
 
-        <div className="relative text-center">
+        <div className="relative text-center mt-4">
           <span className="relative z-10 bg-background px-2 text-sm text-muted-foreground">
             O continuar con
           </span>
@@ -87,7 +145,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 mt-4">
           <Button variant="outline" className="w-full" type="button">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5">
               <path
@@ -117,14 +175,7 @@ export default function LoginPage() {
           </Button>
         </div>
 
-        <div className="text-center text-sm">
-          ¿No tienes una cuenta?{" "}
-          <Link href="/register" className="font-medium text-primary underline-offset-4 hover:underline">
-            Regístrate
-          </Link>
-        </div>
-
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="mt-4 text-center text-xs text-muted-foreground">
           Al hacer clic en continuar, aceptas nuestros{" "}
           <Link href="/terms" className="underline underline-offset-4 hover:text-primary">
             Términos de Servicio

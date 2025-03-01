@@ -8,10 +8,11 @@ import { Skeleton } from './skeleton-loader';
 interface LoadingStateProps {
   isLoading: boolean;
   children: React.ReactNode;
+  fallbackType?: 'spinner' | 'skeleton' | 'blur' | 'none';
   skeleton?: React.ReactNode;
-  spinnerSize?: 'xs' | 'sm' | 'md' | 'lg';
+  fallback?: React.ReactNode;
   className?: string;
-  fallbackType?: 'spinner' | 'skeleton' | 'blur';
+  spinnerSize?: 'xs' | 'sm' | 'md' | 'lg';
   minHeight?: string | number;
   label?: string;
 }
@@ -19,16 +20,22 @@ interface LoadingStateProps {
 export function LoadingState({
   isLoading,
   children,
+  fallbackType = 'skeleton',
   skeleton,
-  spinnerSize = 'md',
+  fallback,
   className,
-  fallbackType = 'spinner',
+  spinnerSize = 'md',
   minHeight = '100px',
   label,
 }: LoadingStateProps) {
   // Si no está cargando, mostrar los hijos
   if (!isLoading) {
     return <>{children}</>;
+  }
+
+  // Si hay un fallback personalizado, usarlo
+  if (fallback) {
+    return <>{fallback}</>;
   }
 
   // Convertir minHeight a CSS válido
@@ -44,55 +51,31 @@ export function LoadingState({
     className
   );
 
-  // Determinar qué tipo de estado de carga mostrar
+  // Diferentes tipos de estados de carga
   switch (fallbackType) {
-    case 'skeleton':
-      // Esqueleto personalizado o esqueleto predeterminado
-      return skeleton || (
-        <div className={baseClasses} style={{ minHeight: getMinHeight() }}>
-          <Skeleton
-            variant="default"
-            count={3}
-            className="w-full"
-            height={25}
-          />
-        </div>
-      );
-
-    case 'blur':
-      // Mostrar los hijos pero con efecto borroso
-      return (
-        <div className={baseClasses} style={{ minHeight: getMinHeight() }}>
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <LoadingSpinner
-              size={spinnerSize}
-              variant="primary"
-              label={label}
-              showLabel={!!label}
-            />
-          </div>
-          <div className="blur-sm opacity-50 pointer-events-none">
-            {children}
-          </div>
-        </div>
-      );
-
     case 'spinner':
-    default:
-      // Mostrar un spinner centrado
       return (
-        <div
-          className={cn(baseClasses, 'flex items-center justify-center')}
-          style={{ minHeight: getMinHeight() }}
-        >
-          <LoadingSpinner
-            size={spinnerSize}
-            variant="primary"
-            label={label}
-            showLabel={!!label}
-          />
+        <div className="flex items-center justify-center w-full h-40">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-200 border-t-sky-600 dark:border-sky-700 dark:border-t-sky-400"></div>
         </div>
       );
+    case 'skeleton':
+      if (skeleton) {
+        return <>{skeleton}</>;
+      }
+      return <Skeleton count={5} className="h-10 mb-4" />;
+    case 'blur':
+      return (
+        <div className="relative">
+          <div className="absolute inset-0 bg-sky-50/80 backdrop-blur-sm dark:bg-sky-900/80 z-10 flex items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-sky-200 border-t-sky-600 dark:border-sky-700 dark:border-t-sky-400"></div>
+          </div>
+          <div className="opacity-50">{children}</div>
+        </div>
+      );
+    case 'none':
+    default:
+      return <>{children}</>;
   }
 }
 

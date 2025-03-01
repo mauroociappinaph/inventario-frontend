@@ -65,19 +65,23 @@ export default function InventoryPage() {
   }, [executeRequest]);
 
   // Filtrar inventario por búsqueda y categoría
-  const filteredInventory = inventoryData.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredInventory = Array.isArray(inventoryData)
+    ? inventoryData.filter((item) => {
+        const matchesSearch =
+          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
+        const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
 
-    return matchesSearch && matchesCategory;
-  });
+        return matchesSearch && matchesCategory;
+      })
+    : [];
 
   // Obtener categorías únicas para el filtro
-  const categories = Array.from(new Set(inventoryData.map(item => item.category)));
+  const categories = Array.from(new Set(Array.isArray(inventoryData)
+    ? inventoryData.map(item => item.category)
+    : []));
 
   // Función para refrescar datos
   const handleRefresh = async () => {

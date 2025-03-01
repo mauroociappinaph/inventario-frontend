@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { OptimizedImage, ImageSize } from './OptimizedImage';
-import { Skeleton } from './skeleton';
+import { Skeleton } from './skeleton-loader';
 import { cn } from '@/lib/utils';
 import { useTypeGuards } from '@/hooks/useTypeGuards';
 import { useEfficiencyOptimizations } from '@/hooks/useEfficiencyOptimizations';
@@ -149,8 +149,6 @@ const CustomAvatar: React.FC<CustomAvatarProps> = ({
     return (
       <div className="relative inline-block">
         <Skeleton
-          variant="circular"
-          diameter={sizeInfo.size}
           className={className}
         />
         {StatusIndicator}

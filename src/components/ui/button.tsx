@@ -1,35 +1,37 @@
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
+"use client"
 
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
-import { TRANSITIONS, ICON_SIZES } from "@/design-system"
 
 const buttonVariants = cva(
-  `inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium
-  ${TRANSITIONS.standard} disabled:pointer-events-none disabled:opacity-50
-  [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0
-  outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]
-  aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive`,
+  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-sky-50 dark:ring-offset-sky-950",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover active:bg-primary-active",
+          "bg-sky-600 text-white hover:bg-sky-700 dark:bg-sky-600 dark:hover:bg-sky-700",
         destructive:
-          "bg-destructive text-white shadow-xs hover:bg-destructive-light active:bg-destructive-dark focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+          "bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700",
         outline:
-          "border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground",
+          "border border-sky-300 bg-transparent hover:bg-sky-100 text-sky-700 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-800",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80 active:bg-secondary/90",
-        ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent/80",
-        link: "text-primary underline-offset-4 hover:underline active:text-primary-dark",
+          "bg-sky-200 text-sky-700 hover:bg-sky-300 dark:bg-sky-700 dark:text-sky-200 dark:hover:bg-sky-600",
+        ghost:
+          "hover:bg-sky-100 text-sky-700 hover:text-sky-900 dark:hover:bg-sky-800 dark:text-sky-300 dark:hover:text-sky-100",
+        link:
+          "underline-offset-4 text-sky-700 hover:underline dark:text-sky-300",
+        success:
+          "bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700",
+        warning:
+          "bg-yellow-500 text-white hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
+        default: "h-10 py-2 px-4",
+        sm: "h-9 px-3 rounded-md",
+        lg: "h-11 px-8 rounded-md",
+        xl: "h-12 px-10 rounded-lg text-base",
+        icon: "h-10 w-10",
       },
     },
     defaultVariants: {
@@ -39,25 +41,25 @@ const buttonVariants = cva(
   }
 )
 
-function Button({
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean
+}
+
+export function Button({
   className,
   variant,
   size,
   asChild = false,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
-  const Comp = asChild ? Slot : "button"
-
+}: ButtonProps) {
   return (
-    <Comp
-      data-slot="button"
+    <button
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
   )
 }
 
-export { Button, buttonVariants }
+export { buttonVariants }

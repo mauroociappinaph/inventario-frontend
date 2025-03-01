@@ -41,8 +41,12 @@ export function middleware(request: NextRequest) {
   }
   */
 
-  // Si es la ruta raíz, redirigir según autenticación
+  // Si es la ruta raíz, permitir acceso directo
   if (pathname === '/') {
+    // Ya no redirigimos automáticamente al dashboard
+    return NextResponse.next();
+
+    /* Código anterior comentado
     // DESARROLLO: Siempre ir al dashboard en desarrollo
     return NextResponse.redirect(new URL('/dashboard', request.url));
 

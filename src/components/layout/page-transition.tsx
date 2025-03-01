@@ -1,78 +1,87 @@
 'use client';
 
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 interface PageTransitionProps {
   children: React.ReactNode;
-  mode?: 'sync' | 'wait' | 'popLayout';
   className?: string;
   transition?: {
-    type?: 'fade' | 'slide' | 'scale' | 'rotate' | 'custom';
+    type?: 'fade' | 'slide' | 'scale' | 'none';
+    direction?: 'left' | 'right' | 'up' | 'down';
     duration?: number;
   };
 }
 
-// Variantes predefinidas para diferentes tipos de animaciones
-const variants = {
-  fade: {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 },
-  },
-  slide: {
-    initial: { x: '100%', opacity: 0 },
-    animate: { x: 0, opacity: 1 },
-    exit: { x: '-100%', opacity: 0 },
-  },
-  scale: {
-    initial: { scale: 0.8, opacity: 0 },
-    animate: { scale: 1, opacity: 1 },
-    exit: { scale: 0.8, opacity: 0 },
-  },
-  rotate: {
-    initial: { rotate: 5, opacity: 0, scale: 0.9 },
-    animate: { rotate: 0, opacity: 1, scale: 1 },
-    exit: { rotate: -5, opacity: 0, scale: 0.9 },
-  },
-  custom: {
-    // Este es para cuando se quiere personalizar completamente
-    initial: {},
-    animate: {},
-    exit: {},
-  },
-};
-
 export function PageTransition({
   children,
-  mode = 'wait',
-  className = '',
-  transition = { type: 'fade', duration: 0.3 },
+  className,
+  transition = { type: 'fade', duration: 0.3 }
 }: PageTransitionProps) {
-  const pathname = usePathname();
-  const { type = 'fade', duration = 0.3 } = transition;
+  const [isVisible, setIsVisible] = React.useState(false);
 
-  // Aplicar la variante seleccionada
-  const selectedVariant = variants[type] || variants.fade;
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true);
+    }, 10);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const getTransitionStyle = () => {
+    const { type, direction, duration = 0.3 } = transition;
+    const transitionDuration = `${duration}s`;
+
+    if (type === 'none') {
+      return {};
+    }
+
+    const baseStyle = {
+      transition: `opacity ${transitionDuration}, transform ${transitionDuration}`,
+      opacity: isVisible ? 1 : 0,
+    };
+
+    switch (type) {
+      case 'slide':
+        const slideDistance = '20px';
+        let transform = '';
+
+        switch (direction) {
+          case 'left':
+            transform = `translateX(${isVisible ? '0' : `-${slideDistance}`})`;
+            break;
+          case 'right':
+            transform = `translateX(${isVisible ? '0' : slideDistance})`;
+            break;
+          case 'up':
+            transform = `translateY(${isVisible ? '0' : `-${slideDistance}`})`;
+            break;
+          case 'down':
+          default:
+            transform = `translateY(${isVisible ? '0' : slideDistance})`;
+            break;
+        }
+
+        return { ...baseStyle, transform };
+
+      case 'scale':
+        return {
+          ...baseStyle,
+          transform: `scale(${isVisible ? 1 : 0.95})`,
+        };
+
+      case 'fade':
+      default:
+        return baseStyle;
+    }
+  };
 
   return (
-    <AnimatePresence mode={mode} initial={false}>
-      <motion.div
-        key={pathname}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        variants={selectedVariant}
-        transition={{
-          duration,
-          ease: 'easeInOut',
-        }}
-        className={className}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <div
+      className={cn('w-full', className)}
+      style={getTransitionStyle()}
+    >
+      {children}
+    </div>
   );
 }
 

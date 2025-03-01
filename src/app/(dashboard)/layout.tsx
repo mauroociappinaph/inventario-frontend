@@ -6,8 +6,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <UIStateProvider>
+    <div className="flex flex-col min-h-screen">
       {children}
-    </UIStateProvider>
+    </div>
   );
 }

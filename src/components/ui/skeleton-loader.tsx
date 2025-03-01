@@ -1,147 +1,78 @@
-import React from 'react';
-import { cn } from '@/lib/utils';
+"use client"
 
-export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'circular' | 'rectangular' | 'text' | 'card' | 'product' | 'table-row';
-  width?: string | number;
-  height?: string | number;
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: "default" | "table-row" | "card" | "image" | "text";
   count?: number;
-  animated?: boolean;
-  className?: string;
 }
 
 export function Skeleton({
-  variant = 'default',
-  width,
-  height,
-  count = 1,
-  animated = true,
   className,
+  variant = "default",
+  count = 1,
   ...props
 }: SkeletonProps) {
-  // Base classes for all skeleton variants
-  const baseClasses = cn(
-    'bg-gray-200 dark:bg-gray-700 rounded',
-    animated && 'animate-pulse',
-    className
-  );
-
-  // Get style based on width and height props
-  const getStyle = () => {
-    const style: React.CSSProperties = {};
-
-    if (width) {
-      style.width = typeof width === 'number' ? `${width}px` : width;
-    }
-
-    if (height) {
-      style.height = typeof height === 'number' ? `${height}px` : height;
-    }
-
-    return style;
-  };
-
-  // Render different variants
   const renderSkeleton = () => {
     switch (variant) {
-      case 'circular':
-        return (
+      case "table-row":
+        return Array.from({ length: count }).map((_, index) => (
           <div
-            className={cn(baseClasses, 'rounded-full')}
-            style={{
-              ...getStyle(),
-              width: width || '40px',
-              height: height || '40px'
-            }}
-            {...props}
-          />
-        );
-
-      case 'text':
-        return (
-          <div
-            className={cn(baseClasses, 'h-4 w-full max-w-full')}
-            style={getStyle()}
-            {...props}
-          />
-        );
-
-      case 'card':
-        return (
-          <div className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden" {...props}>
-            <div className={cn(baseClasses, 'h-48 w-full')} />
-            <div className="p-4 space-y-3">
-              <div className={cn(baseClasses, 'h-5 w-2/3')} />
-              <div className={cn(baseClasses, 'h-4 w-full')} />
-              <div className={cn(baseClasses, 'h-4 w-full')} />
-              <div className="flex justify-between pt-4">
-                <div className={cn(baseClasses, 'h-8 w-24')} />
-                <div className={cn(baseClasses, 'h-8 w-16')} />
-              </div>
-            </div>
+            key={index}
+            className="py-3 animate-pulse flex gap-3 items-center border-b border-sky-200 dark:border-sky-700"
+          >
+            <div className="h-4 w-[5%] bg-sky-200 dark:bg-sky-800 rounded"></div>
+            <div className="h-4 w-[30%] bg-sky-200 dark:bg-sky-800 rounded"></div>
+            <div className="h-4 w-[15%] bg-sky-200 dark:bg-sky-800 rounded"></div>
+            <div className="h-4 w-[10%] bg-sky-200 dark:bg-sky-800 rounded"></div>
+            <div className="h-4 w-[15%] bg-sky-200 dark:bg-sky-800 rounded"></div>
+            <div className="h-4 w-[15%] bg-sky-200 dark:bg-sky-800 rounded"></div>
+            <div className="h-4 w-[10%] bg-sky-200 dark:bg-sky-800 rounded"></div>
           </div>
-        );
-
-      case 'product':
-        return (
-          <div className="border rounded-md p-4">
-            <div className={cn(baseClasses, 'h-40 mb-4')} />
+        ));
+      case "card":
+        return Array.from({ length: count }).map((_, index) => (
+          <div
+            key={index}
+            className="rounded-lg border border-sky-200 dark:border-sky-700 p-4 mb-4 animate-pulse"
+          >
+            <div className="h-5 w-1/3 bg-sky-200 dark:bg-sky-800 rounded mb-4"></div>
             <div className="space-y-2">
-              <div className={cn(baseClasses, 'h-5 w-3/4')} />
-              <div className={cn(baseClasses, 'h-4 w-1/2')} />
-              <div className={cn(baseClasses, 'h-6 w-1/4')} />
-              <div className="flex justify-between mt-4">
-                <div className={cn(baseClasses, 'h-8 w-20')} />
-                <div className={cn(baseClasses, 'h-8 w-8 rounded-full')} />
-              </div>
+              <div className="h-4 w-full bg-sky-200 dark:bg-sky-800 rounded"></div>
+              <div className="h-4 w-5/6 bg-sky-200 dark:bg-sky-800 rounded"></div>
+              <div className="h-4 w-3/4 bg-sky-200 dark:bg-sky-800 rounded"></div>
             </div>
           </div>
-        );
-
-      case 'table-row':
-        return (
-          <div className="flex w-full border-b py-3">
-            <div className={cn(baseClasses, 'h-6 w-1/12 mr-2')} />
-            <div className={cn(baseClasses, 'h-6 w-2/12 mr-2')} />
-            <div className={cn(baseClasses, 'h-6 w-3/12 mr-2')} />
-            <div className={cn(baseClasses, 'h-6 w-2/12 mr-2')} />
-            <div className={cn(baseClasses, 'h-6 w-2/12 mr-2')} />
-            <div className={cn(baseClasses, 'h-6 w-2/12')} />
-          </div>
-        );
-
-      case 'rectangular':
-      case 'default':
-      default:
-        return (
+        ));
+      case "image":
+        return Array.from({ length: count }).map((_, index) => (
           <div
-            className={baseClasses}
-            style={{
-              ...getStyle(),
-              width: width || '100%',
-              height: height || '20px'
-            }}
+            key={index}
+            className="rounded-md bg-sky-200 dark:bg-sky-800 aspect-square animate-pulse"
+          ></div>
+        ));
+      case "text":
+        return Array.from({ length: count }).map((_, index) => (
+          <div key={index} className="space-y-2 animate-pulse">
+            <div className="h-4 w-full bg-sky-200 dark:bg-sky-800 rounded"></div>
+            <div className="h-4 w-[90%] bg-sky-200 dark:bg-sky-800 rounded"></div>
+            <div className="h-4 w-[80%] bg-sky-200 dark:bg-sky-800 rounded"></div>
+          </div>
+        ));
+      default:
+        return Array.from({ length: count }).map((_, index) => (
+          <div
+            key={index}
+            className={cn(
+              "h-4 w-full rounded-sm bg-sky-200 dark:bg-sky-800 animate-pulse",
+              className
+            )}
             {...props}
-          />
-        );
+          ></div>
+        ));
     }
   };
 
-  // Render multiple items if count > 1
-  if (count > 1) {
-    return (
-      <div className="space-y-2">
-        {[...Array(count)].map((_, i) => (
-          <React.Fragment key={i}>
-            {renderSkeleton()}
-          </React.Fragment>
-        ))}
-      </div>
-    );
-  }
-
-  // Render single item
-  return renderSkeleton();
+  return <>{renderSkeleton()}</>;
 }
-
-export default Skeleton;

@@ -2,7 +2,58 @@ import axios from 'axios';
 import Cookies from 'js-cookie';
 
 // Configuración base de axios
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+// Configurar axios para obtener mejores mensajes de error
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  }
+});
+
+// Interceptor para transformar la respuesta de error
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('Error en petición API:', error);
+
+    // Extraer el mensaje de error más útil para el usuario
+    let errorMessage = 'Error en la petición';
+
+    if (error.response) {
+      // El servidor respondió con un código de error
+      console.log('Respuesta de error:', error.response.data);
+
+      if (error.response.data.message) {
+        if (Array.isArray(error.response.data.message)) {
+          // Si el mensaje es un array (validación de class-validator)
+          errorMessage = error.response.data.message[0];
+        } else {
+          errorMessage = error.response.data.message;
+        }
+      } else if (error.response.data.error) {
+        errorMessage = error.response.data.error;
+      }
+    } else if (error.request) {
+      // La petición fue hecha pero no se recibió respuesta
+      errorMessage = 'No se recibió respuesta del servidor';
+    } else {
+      // Algo ocurrió al configurar la petición
+      errorMessage = error.message;
+    }
+
+    // Crear un error personalizado con mensaje claro
+    const customError = {
+      name: error.name || 'Error',
+      message: errorMessage,
+      response: error.response || null,
+      request: error.request || null,
+    };
+
+    return Promise.reject(customError);
+  }
+);
 
 // Tipos para los datos de autenticación
 export interface LoginCredentials {
@@ -39,8 +90,11 @@ const authService = {
   // Iniciar sesión
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await axios.post<AuthResponse>(`${API_URL}/auth/login`, credentials);
-      const data = response.data;
+      console.log('Intentando iniciar sesión con:', credentials.email);
+      const response = await api.post<any>('/auth/login', credentials);
+      console.log('Respuesta login:', response.data);
+
+      const data = response.data.data || response.data;
 
       // Guardar el token en localStorage y cookies
       if (data.token) {
@@ -70,8 +124,11 @@ const authService = {
   // Registrar nuevo usuario
   async register(userData: RegisterData): Promise<AuthResponse> {
     try {
-      const response = await axios.post<AuthResponse>(`${API_URL}/auth/register`, userData);
-      const data = response.data;
+      console.log('Intentando registrar usuario:', userData.email);
+      const response = await api.post<any>('/auth/register', userData);
+      console.log('Respuesta registro:', response.data);
+
+      const data = response.data.data || response.data;
 
       // Guardar el token en localStorage y cookies
       if (data.token) {
