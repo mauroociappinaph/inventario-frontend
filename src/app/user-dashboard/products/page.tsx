@@ -9,15 +9,14 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { Search, Filter, ArrowUpDown, Tag, CheckCircle, XCircle, Loader2, Eye, Plus } from "lucide-react"
-import { productService, ProductStatus, BackendProductStatus, CreateProductDto, ErrorResponse, convertStatusToBackend, convertStatusToFrontend } from "@/lib/api/api" // Importamos el servicio y los tipos
+import { productService, ProductStatus, convertStatusToFrontend, CreateProductDto, ErrorResponse } from "@/lib/api/api"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { useAuth } from "@/context/auth-context" // Importamos el contexto de autenticación
+import { useAuth } from "@/context/auth-context"
 
 // Tipo para los productos
 interface Product {
   _id: string
   name: string
-
   category: string
   price: number
   stock: number
@@ -28,24 +27,17 @@ interface Product {
 // Tipo para los nuevos productos antes de ser enviados al backend
 interface NewProduct {
   name: string
-
   category: string
   price: number
   stock: number
-  status: ProductStatus
 }
 
 // Posibles formatos de respuesta de la API
 interface ApiResponse {
-  data?: Product[]
-  pagination?: {
-    total: number
-    page: number
-    limit: number
-  }
-  total?: number
-  meta?: {
-    total: number
+  data?: {
+    products: Product[],
+    total: number,
+    pages: number
   }
 }
 
@@ -56,7 +48,8 @@ export default function UserProductsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("active") // Por defecto solo mostramos productos activos
+  // Inicializamos el filtro de estado en "all"
+  const [statusFilter, setStatusFilter] = useState("all")
   const [sortBy, setSortBy] = useState("name")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [currentPage, setCurrentPage] = useState(1)
@@ -65,67 +58,64 @@ export default function UserProductsPage() {
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null)
   const [showViewDialog, setShowViewDialog] = useState(false)
 
-  // Estado para el diálogo de crear producto
+  // Estado para el diálogo de crear producto (sin campo status)
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false)
   const [newProduct, setNewProduct] = useState<NewProduct>({
     name: "",
-
     category: "",
     price: 0,
-    stock: 0,
-    status: "active"
+    stock: 0
   })
 
-  // Cargar productos al iniciar
   useEffect(() => {
-    fetchProducts()
-  }, [currentPage, itemsPerPage])
+    if (user?.id) {
+      fetchProducts()
+    }
+  }, [currentPage, itemsPerPage, user])
 
   // Función para cargar productos desde la API
   const fetchProducts = async () => {
     setLoading(true)
     try {
-      const response = await productService.getProducts(currentPage, itemsPerPage) as unknown as ApiResponse | Product[]
-
-      // Manejamos diferentes formatos de respuesta posibles
-      if (Array.isArray(response)) {
-        // Aseguramos que los estados se conviertan correctamente
-        const formattedProducts = response.map(product => ({
-          ...product,
-          status: convertStatusToFrontend(product.status as string) // Convertir estados del backend al frontend
-        }));
-        setProducts(formattedProducts);
-        setTotalPages(1) // Si es un array plano, asumimos una sola página
-      } else {
-        // Si es un objeto con formato de respuesta paginada
-        if (response.data && Array.isArray(response.data)) {
-          // Aseguramos que los estados se conviertan correctamente
-          const formattedProducts = response.data.map(product => ({
-            ...product,
-            status: convertStatusToFrontend(product.status as string) // Convertir estados del backend al frontend
-          }));
-          setProducts(formattedProducts);
-          // Calculamos el total de páginas basado en la estructura de la respuesta
-          const total =
-            response.pagination?.total ||
-            response.total ||
-            response.meta?.total ||
-            response.data.length
-          setTotalPages(Math.ceil(total / itemsPerPage))
-        } else {
-          // Si no hay una estructura reconocible, inicializamos con array vacío
-          setProducts([])
-          setTotalPages(1)
-        }
+      if (!user?.id) {
+        toast({
+          title: "Error de autenticación",
+          description: "Por favor inicie sesión para ver sus productos.",
+          variant: "destructive"
+        })
+        setLoading(false)
+        return
       }
-      setLoading(false)
+
+      const response = await productService.getProducts(currentPage, itemsPerPage, user.id) as unknown as ApiResponse
+
+      if (response.data && Array.isArray(response.data.products)) {
+        // Se asigna "active" por defecto si convertStatusToFrontend retorna un valor falsy
+        const formattedProducts = response.data.products.map((product: Product) => ({
+          ...product,
+          status: convertStatusToFrontend(product.status as string) || "active"
+        }))
+        setProducts(formattedProducts)
+        const total = response.data.total || response.data.products.length
+        setTotalPages(Math.ceil(total / itemsPerPage))
+      } else {
+        setProducts([])
+        setTotalPages(1)
+      }
     } catch (error) {
       console.error("Error al cargar productos:", error)
+      let errorMessage = "No se pudieron cargar los productos. Intente nuevamente."
+      if (error instanceof Error) {
+        if (error.message === 'Usuario no autenticado') {
+          errorMessage = "Por favor inicie sesión para ver sus productos."
+        }
+      }
       toast({
         title: "Error",
-        description: "No se pudieron cargar los productos. Intente nuevamente.",
+        description: errorMessage,
         variant: "destructive"
       })
+    } finally {
       setLoading(false)
     }
   }
@@ -182,28 +172,25 @@ export default function UserProductsPage() {
   // Función para agregar un nuevo producto
   const handleAddProduct = async () => {
     try {
-      // Verificar que se hayan completado todos los campos requeridos
-      if (!newProduct.name ||  !newProduct.category) {
+      if (!newProduct.name || !newProduct.category) {
         toast({
           title: "Campos incompletos",
           description: "Por favor complete todos los campos requeridos",
           variant: "destructive"
-        });
-        return;
+        })
+        return
       }
 
-      // Convertir valores numéricos para asegurar que son números
-      const price = Number(newProduct.price);
-      const stock = Number(newProduct.stock);
+      const price = Number(newProduct.price)
+      const stock = Number(newProduct.stock)
 
-      // Verificar que los valores sean válidos
       if (isNaN(price) || price <= 0) {
         toast({
           title: "Error en datos",
           description: "El precio debe ser un número mayor a 0",
           variant: "destructive"
-        });
-        return;
+        })
+        return
       }
 
       if (isNaN(stock) || stock < 0) {
@@ -211,96 +198,75 @@ export default function UserProductsPage() {
           title: "Error en datos",
           description: "El stock debe ser un número mayor o igual a 0",
           variant: "destructive"
-        });
-        return;
+        })
+        return
       }
 
-      // Crear el nuevo producto con exactamente los campos que el backend espera según CreateProductDto
       const productToAdd: Partial<CreateProductDto> = {
         name: newProduct.name.trim(),
-        description: `${newProduct.name.trim()} `,
         price: price,
         stock: stock,
+        minStock: Math.max(1, Math.floor(stock * 0.1)),
         entryDate: new Date().toISOString(),
+        userId: user?.id || '',
+        category: newProduct.category.trim()
+      }
 
-        category: newProduct.category.trim(),
-        status: convertStatusToBackend(newProduct.status), // Usamos la función de utilidad
-        minStock: Math.max(1, Math.floor(stock * 0.1)) // 10% del stock inicial o mínimo 1
-      };
+      console.log("Enviando datos de producto:", productToAdd)
 
-      console.log("Enviando datos de producto:", productToAdd);
+      const response = await productService.createProduct(productToAdd)
+      console.log("Respuesta del servidor:", response)
 
-      // Intentar crear el producto
-      const response = await productService.createProduct(productToAdd);
-      console.log("Respuesta del servidor:", response);
+      await fetchProducts()
 
-      // Recargar la lista de productos
-      await fetchProducts();
-
-      // Reiniciar el formulario
       setNewProduct({
         name: "",
-
         category: "",
         price: 0,
-        stock: 0,
-        status: "active"
-      });
+        stock: 0
+      })
 
-      // Cerrar el diálogo
-      setIsAddProductDialogOpen(false);
+      setIsAddProductDialogOpen(false)
 
-      // Mostrar notificación
       toast({
         title: "Producto añadido",
         description: `Se ha añadido "${productToAdd.name}" al catálogo de productos.`
-      });
+      })
     } catch (error: unknown) {
-      console.error("Error al crear producto:", error);
-      console.error("Detalles completos del error:", JSON.stringify(error, null, 2));
+      console.error("Error al crear producto:", error)
+      let errorMessage = "No se pudo crear el producto. Intente nuevamente."
 
-      // Intentar obtener un mensaje de error más específico
-      let errorMessage = "No se pudo crear el producto. Intente nuevamente.";
-
-      // Tipamos el error correctamente
-      const typedError = error as ErrorResponse;
-
+      const typedError = error as ErrorResponse
       if (typedError.data && typedError.data.response) {
-        // Si hay un mensaje en la respuesta, usarlo
-        errorMessage = typedError.data.response.data?.message || errorMessage;
-
-        // Si hay errores de validación, formatearlos
+        errorMessage = typedError.data.response.data?.message || errorMessage
         if (typedError.data.response.data?.errors) {
-          const validationErrors = typedError.data.response.data.errors;
+          const validationErrors = typedError.data.response.data.errors
           if (Object.keys(validationErrors).length > 0) {
             errorMessage = Object.entries(validationErrors)
               .map(([campo, mensaje]) => `${campo}: ${mensaje}`)
-              .join(', ');
+              .join(', ')
           }
         }
       } else if (typedError.data?.errors) {
-        // Si es un objeto de error con datos y errores (formato de nuestro interceptor)
-        const validationErrors = typedError.data.errors;
+        const validationErrors = typedError.data.errors
         if (Object.keys(validationErrors).length > 0) {
           errorMessage = Object.entries(validationErrors)
             .map(([campo, mensaje]) => `${campo}: ${mensaje}`)
-            .join(', ');
+            .join(', ')
         } else {
-          errorMessage = typedError.message || errorMessage;
+          errorMessage = typedError.message || errorMessage
         }
       } else if (typedError.message) {
-        // Si hay un mensaje en el objeto de error, usarlo
-        errorMessage = typedError.message;
+        errorMessage = typedError.message
       } else if (typedError.status) {
-        // Si es un error formateado por nuestro interceptor
-        errorMessage = `Error ${typedError.status}: ${typedError.message || 'Error desconocido'}`;
+        errorMessage = `Error ${typedError.status}: ${typedError.message || 'Error desconocido'}`
       }
 
       toast({
         title: "Error al crear producto",
         description: errorMessage,
         variant: "destructive"
-      });
+      })
     }
   }
 
@@ -388,8 +354,6 @@ export default function UserProductsPage() {
                             <ArrowUpDown size={14} className="text-muted-foreground" />
                           </button>
                         </th>
-
-
                         <th className="py-3 px-4 text-left">
                           <button
                             className="flex items-center gap-1"
@@ -417,22 +381,14 @@ export default function UserProductsPage() {
                             <ArrowUpDown size={14} className="text-muted-foreground" />
                           </button>
                         </th>
-                        <th className="py-3 px-4 text-left">
-                          <button
-                            className="flex items-center gap-1"
-                            onClick={() => handleSort("status")}
-                          >
-                            Estado
-                            <ArrowUpDown size={14} className="text-muted-foreground" />
-                          </button>
-                        </th>
+                        <th className="py-3 px-4 text-left">Estado</th>
                         <th className="py-3 px-4 text-right">Acciones</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredProducts.length === 0 ? (
                         <tr className="border-b">
-                          <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                          <td colSpan={6} className="py-8 text-center text-muted-foreground">
                             No se encontraron productos con los filtros actuales.
                           </td>
                         </tr>
@@ -440,7 +396,6 @@ export default function UserProductsPage() {
                         filteredProducts.map((product) => (
                           <tr key={product._id} className="border-b transition-colors hover:bg-muted/50">
                             <td className="py-3 px-4">{product.name}</td>
-
                             <td className="py-3 px-4">
                               <Badge variant="outline" className="font-normal">
                                 {product.category}
@@ -494,8 +449,6 @@ export default function UserProductsPage() {
                 <div className="text-sm text-muted-foreground">
                   Mostrando {filteredProducts.length} de {products.length} productos
                 </div>
-
-                {/* Paginación simple */}
                 {totalPages > 1 && (
                   <div className="flex gap-2">
                     <Button
@@ -525,7 +478,6 @@ export default function UserProductsPage() {
         </CardContent>
       </Card>
 
-      {/* Diálogo para ver detalles del producto */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -540,7 +492,6 @@ export default function UserProductsPage() {
                 <div className="font-semibold text-right">Nombre:</div>
                 <div className="col-span-2">{viewingProduct.name}</div>
               </div>
-
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="font-semibold text-right">Categoría:</div>
                 <div className="col-span-2">{viewingProduct.category}</div>
@@ -603,7 +554,6 @@ export default function UserProductsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo para crear nuevo producto */}
       <Dialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -620,13 +570,10 @@ export default function UserProductsPage() {
               <Input
                 id="name"
                 value={newProduct.name}
-                onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                 className="col-span-3"
                 placeholder="Ej: Monitor Samsung 24&quot;"
               />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="text-right">
@@ -635,7 +582,7 @@ export default function UserProductsPage() {
               <Input
                 id="category"
                 value={newProduct.category}
-                onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                 className="col-span-3"
                 placeholder="Ej: Electrónica, Periféricos, etc."
               />
@@ -648,7 +595,7 @@ export default function UserProductsPage() {
                 id="price"
                 type="number"
                 value={newProduct.price || ""}
-                onChange={(e) => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})}
+                onChange={(e) => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) || 0 })}
                 className="col-span-3"
                 min="0"
                 step="0.01"
@@ -662,29 +609,10 @@ export default function UserProductsPage() {
                 id="stock"
                 type="number"
                 value={newProduct.stock || ""}
-                onChange={(e) => setNewProduct({...newProduct, stock: parseInt(e.target.value) || 0})}
+                onChange={(e) => setNewProduct({ ...newProduct, stock: parseInt(e.target.value) || 0 })}
                 className="col-span-3"
                 min="0"
               />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">
-                Estado
-              </Label>
-              <Select
-                value={newProduct.status}
-                onValueChange={(value: "active" | "inactive") =>
-                  setNewProduct({...newProduct, status: value})
-                }
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Seleccionar estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Activo</SelectItem>
-                  <SelectItem value="inactive">Inactivo</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>

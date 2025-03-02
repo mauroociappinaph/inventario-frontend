@@ -131,9 +131,8 @@ export interface CreateProductDto {
   stock: number;
   entryDate: string; // ISO string
   category?: string;
-  status?: BackendProductStatus;
-  barcode?: string;
   minStock?: number;
+  userId?: string;
 }
 
 export interface ErrorResponse {
@@ -162,10 +161,18 @@ export const authService = {
   },
 };
 
+// Función para convertir el estado del backend al frontend
+export const convertStatusToFrontend = (backendStatus: string): ProductStatus => {
+  return backendStatus === 'activo' ? 'active' : 'inactive';
+};
+
 // Servicio de productos
 export const productService = {
-  getProducts: async (page = 1, limit = 10) => {
-    return api.get(`/products?page=${page}&limit=${limit}`);
+  getProducts: async (page = 1, limit = 10, userId?: string) => {
+    if (!userId) {
+      throw new Error('Usuario no autenticado');
+    }
+    return api.get(`/products?page=${page}&limit=${limit}&userId=${userId}`);
   },
   getProductById: async (id: string) => {
     return api.get(`/products/${id}`);
@@ -195,15 +202,13 @@ export const productService = {
 
       // Creamos un objeto exactamente con la estructura que espera el DTO del backend
       const dtoData: CreateProductDto = {
-        name: productData.name || '',
-        description: productData.description || `${productData.name} - ${productData.barcode || ''}`,
-        price: Number(productData.price || 0),
-        stock: Number(productData.stock || 0),
+        name: productData.name?.trim() || '',
+        price: Math.max(0, Number(productData.price || 0)),
+        stock: Math.max(0, Number(productData.stock || 0)),
+        minStock: Math.max(0, Number(productData.minStock || Math.max(1, Math.floor(Number(productData.stock || 0) * 0.1)))),
         entryDate: entryDate.toISOString(),
-        category: productData.category || '',
-        status: convertStatusToBackend(productData.status),
-        barcode: productData.barcode || '',
-        minStock: Number(productData.minStock || Math.max(1, Math.floor(Number(productData.stock || 0) * 0.1)))
+        category: productData.category?.trim() || '',
+        userId: productData.userId || '',
       };
 
       console.log('Enviando datos al backend:', JSON.stringify(dtoData, null, 2));
@@ -305,53 +310,4 @@ export const orderService = {
   deleteOrder: async (id: string) => {
     return api.delete(`/orders/${id}`);
   },
-  updateOrderStatus: async (id: string, statusData: any) => {
-    return api.put(`/orders/${id}/status`, statusData);
-  },
-  getOrderStatistics: async () => {
-    return api.get('/orders/statistics');
-  },
-  getOrdersBySupplier: async (supplierId: string) => {
-    return api.get(`/orders/supplier/${supplierId}`);
-  }
 };
-
-// Servicio para la gestión de usuarios
-export const userService = {
-  getUsers: async (page = 1, limit = 10, role?: string) => {
-    let url = `/users?page=${page}&limit=${limit}`;
-    if (role) url += `&role=${role}`;
-    return api.get(url);
-  },
-  getUserById: async (id: string) => {
-    return api.get(`/users/${id}`);
-  },
-  createUser: async (userData: any) => {
-    return api.post('/users', userData);
-  },
-  updateUser: async (id: string, userData: any) => {
-    return api.put(`/users/${id}`, userData);
-  },
-  deleteUser: async (id: string) => {
-    return api.delete(`/users/${id}`);
-  },
-  getUsersByRole: async (role: string) => {
-    return api.get(`/users/role/${role}`);
-  },
-  updateUserRole: async (id: string, roleData: any) => {
-    return api.put(`/users/${id}/role`, roleData);
-  }
-};
-
-// Funciones de utilidad para convertir estados entre frontend y backend
-export function convertStatusToBackend(status?: ProductStatus | string): BackendProductStatus {
-  if (!status) return 'activo';
-  return status === 'active' ? 'activo' : 'inactivo';
-}
-
-export function convertStatusToFrontend(status?: BackendProductStatus | string): ProductStatus {
-  if (!status) return 'active';
-  return status.toLowerCase() === 'activo' ? 'active' : 'inactive';
-}
-
-export default api;
