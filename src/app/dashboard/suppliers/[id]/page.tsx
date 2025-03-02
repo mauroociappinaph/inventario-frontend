@@ -57,7 +57,7 @@ interface Supplier {
 interface Product {
   _id: string;
   name: string;
-  sku: string;
+
   price: number;
   stock: number;
   category: string;
@@ -329,7 +329,7 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
                       <TableHeader>
                         <TableRow>
                           <TableHead>Producto</TableHead>
-                          <TableHead>SKU</TableHead>
+
                           <TableHead>Categoría</TableHead>
                           <TableHead>Precio</TableHead>
                           <TableHead>Stock</TableHead>
@@ -339,7 +339,7 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
                         {products.map((product) => (
                           <TableRow key={product._id}>
                             <TableCell className="font-medium">{product.name}</TableCell>
-                            <TableCell>{product.sku}</TableCell>
+
                             <TableCell>{product.category}</TableCell>
                             <TableCell>${product.price.toFixed(2)}</TableCell>
                             <TableCell>

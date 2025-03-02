@@ -92,12 +92,36 @@ const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
       console.log('Intentando iniciar sesión con:', credentials.email);
-      const response = await api.post<AuthResponse>('/auth/login', credentials);
+      const response = await api.post<any>('/auth/login', credentials);
       console.log('Respuesta login:', response.data);
 
-      this.saveAuthData(response.data);
+      // Adaptar la estructura de respuesta
+      let authData: AuthResponse;
 
-      return response.data;
+      if (response.data.data && response.data.data.token) {
+        // Si la respuesta tiene un estructura como { statusCode, message, data: { token, user } }
+        authData = {
+          token: response.data.data.token,
+          user: response.data.data.user
+        };
+      } else {
+        // Si la respuesta ya tiene el formato esperado
+        authData = response.data;
+      }
+       if (authData.user && authData.user.roles) {
+      if (authData.user.roles.includes('usuario')) {
+        console.log('El usuario tiene rol "usuario". Iniciando sesión como usuario.');
+        // Por ejemplo, redirigir al dashboard de usuario:
+        window.location.href = '/user-dashboard';
+      } else if (authData.user.roles.includes('admin')) {
+        console.log('El usuario tiene rol "admin". Iniciando sesión como administrador.');
+        // Por ejemplo, redirigir al dashboard de admin:
+        window.location.href = '/dashboard';
+        }
+      }
+
+      this.saveAuthData(authData);
+      return authData;
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
       throw error;
@@ -112,7 +136,13 @@ const authService = {
 
       // Si hay datos de usuario, guardarlos también
       if (authData.user) {
-        localStorage.setItem('user_data', JSON.stringify(authData.user));
+        // Asegurarse de que el usuario tenga un campo 'id' (convertir _id a id si es necesario)
+        const userData = authData.user;
+        if ((userData as any)._id && !userData.id) {
+          (userData as any).id = (userData as any)._id;
+        }
+
+        localStorage.setItem('user_data', JSON.stringify(userData));
       }
 
       // Guardar en cookies para que sea accesible por el middleware

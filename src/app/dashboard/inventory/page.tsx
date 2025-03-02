@@ -31,7 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 interface Product {
   id: string
   name: string
-  sku: string
+
   category: string
   stock: number
   minimumStock: number
@@ -57,58 +57,6 @@ export default function InventoryPage() {
   // Verificar si el usuario es administrador
   const isAdmin = user?.roles?.includes('admin')
 
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "1",
-      name: "Laptop HP Pavilion",
-      sku: "HP-PAV-001",
-      category: "Electrónica",
-      stock: 15,
-      minimumStock: 5,
-      location: "Almacén A - Estantería 3",
-      lastUpdated: "2023-10-15T14:30:00Z"
-    },
-    {
-      id: "2",
-      name: "Monitor Samsung 27\"",
-      sku: "SAM-MON-27-001",
-      category: "Electrónica",
-      stock: 8,
-      minimumStock: 3,
-      location: "Almacén A - Estantería 2",
-      lastUpdated: "2023-10-10T09:45:00Z"
-    },
-    {
-      id: "3",
-      name: "Teclado Mecánico RGB",
-      sku: "KB-MECH-RGB-001",
-      category: "Periféricos",
-      stock: 23,
-      minimumStock: 10,
-      location: "Almacén B - Estantería 1",
-      lastUpdated: "2023-10-20T11:20:00Z"
-    },
-    {
-      id: "4",
-      name: "Mouse Inalámbrico",
-      sku: "MOUSE-WL-001",
-      category: "Periféricos",
-      stock: 5,
-      minimumStock: 8,
-      location: "Almacén B - Estantería 1",
-      lastUpdated: "2023-10-05T16:15:00Z"
-    },
-    {
-      id: "5",
-      name: "Audífonos Bluetooth",
-      sku: "AUD-BT-001",
-      category: "Audio",
-      stock: 12,
-      minimumStock: 7,
-      location: "Almacén C - Estantería 4",
-      lastUpdated: "2023-10-18T13:10:00Z"
-    }
-  ])
 
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([
     {
@@ -175,7 +123,7 @@ export default function InventoryPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
 
   // Obtener categorías únicas para el filtro
-  const categories = Array.from(new Set(products.map(p => p.category)))
+  const categories = Array.from(new Set(products.map(p => p.category))) as string[]
 
   // Calcular estadísticas de inventario
   const totalProducts = products.length
@@ -197,7 +145,7 @@ export default function InventoryPage() {
   const filteredProducts = products
     .filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+
                            product.location.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter
       const matchesStock = stockFilter === "all" ||
@@ -274,17 +222,14 @@ export default function InventoryPage() {
     // Actualizar stock del producto
     const stockChange = movementType === "entry"
       ? movementQuantity
-      : (movementType === "exit" ? -movementQuantity : movementQuantity)
+      : movementType === "exit" ? -movementQuantity : 0;
 
-    setProducts(products.map(p => {
-      if (p.id === selectedProduct.id) {
-        return {
-          ...p,
-          stock: p.stock + stockChange,
-          lastUpdated: new Date().toISOString()
-        }
-      }
-      return p
+    // Actualizar el stock del producto
+    const updatedProduct = {
+      ...selectedProduct,
+      stock: selectedProduct.stock + stockChange,
+      lastUpdated: new Date().toISOString()
+    }
     }))
 
     // Añadir el movimiento al historial
@@ -528,13 +473,7 @@ export default function InventoryPage() {
                           </button>
                         </th>
                         <th className="py-3 px-4 text-left">
-                          <button
-                            className="flex items-center gap-1"
-                            onClick={() => handleSort("sku")}
-                          >
-                            SKU
-                            <ArrowUpDown size={14} className="text-muted-foreground" />
-                          </button>
+
                         </th>
                         <th className="py-3 px-4 text-left hidden md:table-cell">Categoría</th>
                         <th className="py-3 px-4 text-left hidden lg:table-cell">Ubicación</th>
@@ -560,12 +499,12 @@ export default function InventoryPage() {
                           </td>
                         </tr>
                       ) : (
-                        filteredProducts.map((product) => {
+                        filteredProducts.map((product: Product) => {
                           const stockStatus = getStockStatusInfo(product)
                           return (
                             <tr key={product.id} className="border-b transition-colors hover:bg-muted/50">
                               <td className="py-3 px-4 font-medium">{product.name}</td>
-                              <td className="py-3 px-4 text-muted-foreground">{product.sku}</td>
+
                               <td className="py-3 px-4 hidden md:table-cell">
                                 <Badge variant="outline" className="font-normal">
                                   {product.category}
@@ -732,7 +671,7 @@ export default function InventoryPage() {
           <DialogHeader>
             <DialogTitle>{getMovementDialogTitle()}</DialogTitle>
             <DialogDescription>
-              {selectedProduct ? `Producto: ${selectedProduct.name} (${selectedProduct.sku})` : ""}
+              {selectedProduct ? `Producto: ${selectedProduct.name} ` : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

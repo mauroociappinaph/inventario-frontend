@@ -31,7 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 interface Product {
   id: string
   name: string
-  sku: string
+
   category: string
   stock: number
   minimumStock: number
@@ -59,58 +59,7 @@ export default function UserInventoryPage() {
   // Los usuarios normales no son administradores
   const isAdmin = false
 
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "1",
-      name: "Laptop HP Pavilion",
-      sku: "HP-PAV-001",
-      category: "Electrónica",
-      stock: 15,
-      minimumStock: 5,
-      location: "Almacén A - Estantería 3",
-      lastUpdated: "2023-10-15T14:30:00Z"
-    },
-    {
-      id: "2",
-      name: "Monitor Samsung 27\"",
-      sku: "SAM-MON-27-001",
-      category: "Electrónica",
-      stock: 8,
-      minimumStock: 3,
-      location: "Almacén A - Estantería 2",
-      lastUpdated: "2023-10-10T09:45:00Z"
-    },
-    {
-      id: "3",
-      name: "Teclado Mecánico RGB",
-      sku: "KB-MECH-RGB-001",
-      category: "Periféricos",
-      stock: 23,
-      minimumStock: 10,
-      location: "Almacén B - Estantería 1",
-      lastUpdated: "2023-10-20T11:20:00Z"
-    },
-    {
-      id: "4",
-      name: "Mouse Inalámbrico",
-      sku: "MOUSE-WL-001",
-      category: "Periféricos",
-      stock: 5,
-      minimumStock: 8,
-      location: "Almacén B - Estantería 1",
-      lastUpdated: "2023-10-05T16:15:00Z"
-    },
-    {
-      id: "5",
-      name: "Audífonos Bluetooth",
-      sku: "AUD-BT-001",
-      category: "Audio",
-      stock: 12,
-      minimumStock: 7,
-      location: "Almacén C - Estantería 4",
-      lastUpdated: "2023-10-18T13:10:00Z"
-    }
-  ])
+
 
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([
     {
@@ -180,7 +129,7 @@ export default function UserInventoryPage() {
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false)
   const [newProduct, setNewProduct] = useState({
     name: "",
-    sku: "",
+
     category: "",
     minimumStock: 0,
     stock: 0,
@@ -210,9 +159,9 @@ export default function UserInventoryPage() {
 
   // Filtrar y ordenar productos
   const filteredProducts = products
-    .filter(product => {
+    .filter(product  => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+
                            product.location.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter
       const matchesStock = stockFilter === "all" ||
@@ -345,7 +294,7 @@ export default function UserInventoryPage() {
     const productToAdd: Product = {
       id: newId,
       name: newProduct.name,
-      sku: newProduct.sku,
+
       category: newProduct.category,
       stock: newProduct.stock,
       minimumStock: newProduct.minimumStock,
@@ -361,7 +310,7 @@ export default function UserInventoryPage() {
     // Reiniciar el formulario
     setNewProduct({
       name: "",
-      sku: "",
+
       category: "",
       minimumStock: 0,
       stock: 0,
@@ -553,13 +502,7 @@ export default function UserInventoryPage() {
                           </button>
                         </th>
                         <th className="py-3 px-4 text-left">
-                          <button
-                            className="flex items-center gap-1"
-                            onClick={() => handleSort("sku")}
-                          >
-                            SKU
-                            <ArrowUpDown size={14} className="text-muted-foreground" />
-                          </button>
+
                         </th>
                         <th className="py-3 px-4 text-left hidden md:table-cell">Categoría</th>
                         <th className="py-3 px-4 text-left hidden lg:table-cell">Ubicación</th>
@@ -584,12 +527,12 @@ export default function UserInventoryPage() {
                           </td>
                         </tr>
                       ) : (
-                        filteredProducts.map((product) => {
+                        filteredProducts.map((product: any) => {
                           const stockStatus = getStockStatusInfo(product)
                           return (
                             <tr key={product.id} className="border-b transition-colors hover:bg-muted/50">
                               <td className="py-3 px-4 font-medium">{product.name}</td>
-                              <td className="py-3 px-4 text-muted-foreground">{product.sku}</td>
+
                               <td className="py-3 px-4 hidden md:table-cell">
                                 <Badge variant="outline" className="font-normal">
                                   {product.category}
@@ -700,7 +643,7 @@ export default function UserInventoryPage() {
           <DialogHeader>
             <DialogTitle>Registrar Consumo de Inventario</DialogTitle>
             <DialogDescription>
-              {selectedProduct ? `Producto: ${selectedProduct.name} (${selectedProduct.sku})` : ""}
+              {selectedProduct ? `Producto: ${selectedProduct.name} ` : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -790,16 +733,8 @@ export default function UserInventoryPage() {
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="sku" className="text-right">
-                SKU
-              </Label>
-              <Input
-                id="sku"
-                value={newProduct.sku}
-                onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
-                className="col-span-3"
-                placeholder="Ej: MON-SAM-24"
-              />
+
+
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="text-right">
@@ -883,7 +818,7 @@ export default function UserInventoryPage() {
             <Button
               type="submit"
               onClick={handleAddProduct}
-              disabled={!newProduct.name || !newProduct.sku || !newProduct.category}
+              disabled={!newProduct.name || !newProduct.category}
             >
               Guardar Producto
             </Button>

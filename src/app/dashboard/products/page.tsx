@@ -11,13 +11,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { Pencil, Plus, Trash2, Search, Filter, ArrowUpDown, Tag, CheckCircle, XCircle, Loader2 } from "lucide-react"
-import { productService } from "@/lib/api/api" // Importamos el servicio de productos existente
+import { BackendProductStatus, productService } from "@/lib/api/api" // Importamos el servicio de productos existente
 
 // Tipo para los productos
 interface Product {
   _id: string
   name: string
-  sku: string
+
   category: string
   price: number
   stock: number
@@ -50,7 +50,7 @@ export default function ProductsPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [newProduct, setNewProduct] = useState({
     name: "",
-    sku: "",
+
     category: "",
     price: 0,
     stock: 0
@@ -122,8 +122,8 @@ export default function ProductsPage() {
   // Filtrar y ordenar productos
   const filteredProducts = products
     .filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.sku.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
+
       const matchesCategory = categoryFilter === "" || product.category === categoryFilter
       const matchesStatus = statusFilter === "" || product.status === statusFilter
 
@@ -146,7 +146,7 @@ export default function ProductsPage() {
     try {
       const productToAdd = {
         name: newProduct.name,
-        sku: newProduct.sku,
+
         category: newProduct.category,
         price: newProduct.price,
         stock: newProduct.stock,
@@ -158,7 +158,7 @@ export default function ProductsPage() {
 
       setNewProduct({
         name: "",
-        sku: "",
+
         category: "",
         price: 0,
         stock: 0
@@ -192,11 +192,10 @@ export default function ProductsPage() {
     try {
       await productService.updateProduct(editingProduct._id, {
         name: editingProduct.name,
-        sku: editingProduct.sku,
         category: editingProduct.category,
         price: editingProduct.price,
         stock: editingProduct.stock,
-        status: editingProduct.status
+        status: editingProduct.status as BackendProductStatus
       })
 
       fetchProducts() // Recargar productos
@@ -356,13 +355,7 @@ export default function ProductsPage() {
                           </button>
                         </th>
                         <th className="py-3 px-4 text-left">
-                          <button
-                            className="flex items-center gap-1"
-                            onClick={() => handleSort("sku")}
-                          >
-                            SKU
-                            <ArrowUpDown size={14} className="text-muted-foreground" />
-                          </button>
+
                         </th>
                         <th className="py-3 px-4 text-left">
                           <button
@@ -414,7 +407,7 @@ export default function ProductsPage() {
                         filteredProducts.map((product) => (
                           <tr key={product._id} className="border-b transition-colors hover:bg-muted/50">
                             <td className="py-3 px-4">{product.name}</td>
-                            <td className="py-3 px-4">{product.sku}</td>
+
                             <td className="py-3 px-4">
                               <Badge variant="outline" className="font-normal">
                                 {product.category}
@@ -537,17 +530,7 @@ export default function ProductsPage() {
                 className="col-span-3"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="sku" className="text-right">
-                SKU
-              </Label>
-              <Input
-                id="sku"
-                value={newProduct.sku}
-                onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
-                className="col-span-3"
-              />
-            </div>
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="text-right">
                 Categoría
@@ -621,17 +604,7 @@ export default function ProductsPage() {
                   className="col-span-3"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-sku" className="text-right">
-                  SKU
-                </Label>
-                <Input
-                  id="edit-sku"
-                  value={editingProduct.sku}
-                  onChange={(e) => setEditingProduct({...editingProduct, sku: e.target.value})}
-                  className="col-span-3"
-                />
-              </div>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="edit-category" className="text-right">
                   Categoría

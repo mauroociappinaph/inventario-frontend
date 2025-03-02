@@ -27,7 +27,7 @@ api.interceptors.request.use((config) => {
 export interface InventoryProduct {
   id: string;
   name: string;
-  sku: string;
+
   category: string;
   stock: number;
   price: number;

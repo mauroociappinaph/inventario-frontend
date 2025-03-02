@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { login } = useAuth(); // Usar el hook de autenticación
+  const { login } = useAuth();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -35,17 +35,44 @@ export default function LoginPage() {
       }
 
       // Usar el método login del contexto en lugar de llamar directamente al servicio
-      await login(email, password);
+      const response = await login(email, password);
       toast.success('Inicio de sesión exitoso');
 
-      // Obtener la URL de redirección de los parámetros de la URL (si existe)
-      const params = new URLSearchParams(window.location.search);
-      const redirectTo = params.get('from') || '/dashboard';
+      // Verificar el rol del usuario directamente desde la respuesta o localStorage
+      const userData = response?.user || JSON.parse(localStorage.getItem('user_data') || '{}');
+      const userRoles = userData?.roles || [];
+      const isUserAdmin = userRoles.includes('admin');
 
-      // Pequeña pausa para asegurar que el estado se actualice antes de la redirección
+      // Obtener la URL de redirección de los parámetros de la URL (si existe)
+      let redirectTo;
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const fromParam = params.get('from');
+        if (fromParam) {
+          redirectTo = fromParam;
+        } else {
+          // Redirigir según el rol verificado
+          if (isUserAdmin) {
+            redirectTo = '/dashboard'; // Dashboard del administrador
+          } else {
+            redirectTo = '/user-dashboard'; // Dashboard del usuario regular
+          }
+        }
+      } catch (err) {
+        console.error('Error al obtener parámetros de URL:', err);
+        // Redirigir según el rol verificado (caso predeterminado si hay error)
+        if (isUserAdmin) {
+          redirectTo = '/dashboard';
+        } else {
+          redirectTo = '/user-dashboard';
+        }
+      }
+
+      // Usar navegación programática con un retraso para asegurar que el estado se actualice
+      console.log('Redireccionando a:', redirectTo);
       setTimeout(() => {
         router.push(redirectTo);
-      }, 100);
+      }, 300);
     } catch (error: unknown) {
       console.error('Error de inicio de sesión:', error);
       let errorMessage = 'Error al iniciar sesión';

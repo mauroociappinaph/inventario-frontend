@@ -17,7 +17,7 @@ import { useAuth } from "@/context/auth-context" // Importamos el contexto de au
 interface Product {
   _id: string
   name: string
-  sku: string
+
   category: string
   price: number
   stock: number
@@ -28,7 +28,7 @@ interface Product {
 // Tipo para los nuevos productos antes de ser enviados al backend
 interface NewProduct {
   name: string
-  sku: string
+
   category: string
   price: number
   stock: number
@@ -69,7 +69,7 @@ export default function UserProductsPage() {
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false)
   const [newProduct, setNewProduct] = useState<NewProduct>({
     name: "",
-    sku: "",
+
     category: "",
     price: 0,
     stock: 0,
@@ -146,8 +146,7 @@ export default function UserProductsPage() {
   // Filtrar y ordenar productos
   const filteredProducts = products
     .filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.sku.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter
       const matchesStatus = statusFilter === "all" || product.status === statusFilter
 
@@ -184,7 +183,7 @@ export default function UserProductsPage() {
   const handleAddProduct = async () => {
     try {
       // Verificar que se hayan completado todos los campos requeridos
-      if (!newProduct.name || !newProduct.sku || !newProduct.category) {
+      if (!newProduct.name ||  !newProduct.category) {
         toast({
           title: "Campos incompletos",
           description: "Por favor complete todos los campos requeridos",
@@ -219,11 +218,11 @@ export default function UserProductsPage() {
       // Crear el nuevo producto con exactamente los campos que el backend espera según CreateProductDto
       const productToAdd: Partial<CreateProductDto> = {
         name: newProduct.name.trim(),
-        description: `${newProduct.name.trim()} - ${newProduct.sku.trim()}`,
+        description: `${newProduct.name.trim()} `,
         price: price,
         stock: stock,
         entryDate: new Date().toISOString(),
-        barcode: newProduct.sku.trim(), // Usamos el SKU como código de barras
+
         category: newProduct.category.trim(),
         status: convertStatusToBackend(newProduct.status), // Usamos la función de utilidad
         minStock: Math.max(1, Math.floor(stock * 0.1)) // 10% del stock inicial o mínimo 1
@@ -241,7 +240,7 @@ export default function UserProductsPage() {
       // Reiniciar el formulario
       setNewProduct({
         name: "",
-        sku: "",
+
         category: "",
         price: 0,
         stock: 0,
@@ -389,15 +388,8 @@ export default function UserProductsPage() {
                             <ArrowUpDown size={14} className="text-muted-foreground" />
                           </button>
                         </th>
-                        <th className="py-3 px-4 text-left">
-                          <button
-                            className="flex items-center gap-1"
-                            onClick={() => handleSort("sku")}
-                          >
-                            SKU
-                            <ArrowUpDown size={14} className="text-muted-foreground" />
-                          </button>
-                        </th>
+
+
                         <th className="py-3 px-4 text-left">
                           <button
                             className="flex items-center gap-1"
@@ -448,7 +440,7 @@ export default function UserProductsPage() {
                         filteredProducts.map((product) => (
                           <tr key={product._id} className="border-b transition-colors hover:bg-muted/50">
                             <td className="py-3 px-4">{product.name}</td>
-                            <td className="py-3 px-4">{product.sku}</td>
+
                             <td className="py-3 px-4">
                               <Badge variant="outline" className="font-normal">
                                 {product.category}
@@ -548,10 +540,7 @@ export default function UserProductsPage() {
                 <div className="font-semibold text-right">Nombre:</div>
                 <div className="col-span-2">{viewingProduct.name}</div>
               </div>
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div className="font-semibold text-right">SKU:</div>
-                <div className="col-span-2">{viewingProduct.sku}</div>
-              </div>
+
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="font-semibold text-right">Categoría:</div>
                 <div className="col-span-2">{viewingProduct.category}</div>
@@ -637,16 +626,7 @@ export default function UserProductsPage() {
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="sku" className="text-right">
-                SKU
-              </Label>
-              <Input
-                id="sku"
-                value={newProduct.sku}
-                onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
-                className="col-span-3"
-                placeholder="Ej: MON-SAM-24"
-              />
+
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="text-right">
@@ -714,7 +694,7 @@ export default function UserProductsPage() {
             <Button
               type="submit"
               onClick={handleAddProduct}
-              disabled={!newProduct.name || !newProduct.sku || !newProduct.category || newProduct.price <= 0}
+              disabled={!newProduct.name || !newProduct.category || newProduct.price <= 0}
             >
               Guardar Producto
             </Button>
