@@ -1,15 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Home, LayoutGrid, Package, ShoppingCart, Users } from "lucide-react"
 import { DashboardStats } from "@/components/dashboard/DashboardStats"
 import { InventoryOverview } from "@/components/dashboard/InventoryOverview"
 import { MainLayout } from "@/components/layout/MainLayout"
+import { useLoading } from "@/hooks/useLoading"
 
 export default function DashboardPage() {
   // Estados para la página
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(true)
   const [activeItemId, setActiveItemId] = useState("dashboard")
+  const { resetAllLoadingStates } = useLoading()
+
+  // Resetear cualquier estado de carga pendiente al montar la página
+  useEffect(() => {
+    resetAllLoadingStates()
+  }, [resetAllLoadingStates])
 
   // Simular un recorrido guiado
   const startTour = () => {
@@ -34,23 +41,7 @@ export default function DashboardPage() {
           id: "inventory",
           label: "Inventario",
           icon: <Package className="h-4 w-4" />,
-          items: [
-            {
-              id: "inventory-list",
-              label: "Lista de Productos",
-              href: "/dashboard/inventory"
-            },
-            {
-              id: "inventory-categories",
-              label: "Categorías",
-              href: "/dashboard/inventory/categories"
-            },
-            {
-              id: "inventory-stock",
-              label: "Gestión de Stock",
-              href: "/dashboard/inventory/stock"
-            }
-          ]
+          href: "/dashboard/inventory"
         },
         {
           id: "suppliers",

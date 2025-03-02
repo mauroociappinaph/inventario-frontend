@@ -58,5 +58,13 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    function ({ addComponents }) {
+      addComponents({
+        '.btn, button, [role="button"]': {
+          "@apply active:scale-95 transition-transform": {},
+        },
+      });
+    },
+  ],
 };

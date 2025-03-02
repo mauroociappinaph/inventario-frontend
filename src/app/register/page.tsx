@@ -105,8 +105,13 @@ export default function RegisterPage() {
 
       console.log('Registro completado exitosamente');
 
-      // Mostrar el modal de éxito en lugar de redireccionar inmediatamente
-      setShowSuccessModal(true);
+      // Mostrar notificación de éxito
+      toast.success('Registro exitoso. ¡Bienvenido!');
+
+      // Pequeña pausa para asegurar que el estado se actualice antes de la redirección
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 100);
     } catch (error: unknown) {
       console.error('Error completo de registro:', error);
       let errorMessage = 'Error al registrar usuario';

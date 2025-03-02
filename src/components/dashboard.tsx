@@ -19,6 +19,8 @@ import {
   AlertCircle,
   ArrowRight,
   Calendar,
+  Package,
+  LogOut,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "./ui/card"
 import { Button } from "./ui/button"
@@ -34,6 +36,7 @@ import ActionSearchBar from "./actionSearchBar"
 import { useInventory } from "@/hooks/useInventory"
 import { Skeleton } from "./ui/skeleton"
 import { Badge } from "./ui/badge"
+import { useAuth } from '@/context/auth-context'
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
@@ -50,6 +53,8 @@ export default function Dashboard() {
     inventoryStats,
     inventoryStatsLoading
   } = useInventory();
+
+  const { logout } = useAuth();
 
   // Simulamos que los datos se cargan después de 2 segundos
   useEffect(() => {
@@ -104,6 +109,10 @@ export default function Dashboard() {
     navigateTo("/dashboard/users/roles", "user-roles")
   }, [navigateTo])
 
+  const handleLogout = useCallback(() => {
+    logout();
+  }, [logout]);
+
   // Definición memoizada de las secciones y elementos del sidebar
   const sidebarSections = useCallback(
     (): SidebarSection[] => [
@@ -119,6 +128,12 @@ export default function Dashboard() {
             badge: { count: 2, color: "bg-primary text-primary-foreground" },
           },
           {
+            id: "inventory",
+            icon: <Package className="h-4 w-4" />,
+            label: "Inventario",
+            href: "/dashboard/inventory",
+          },
+          {
             id: "stats",
             icon: <BarChart2 className="h-4 w-4" />,
             label: "Estadísticas",
@@ -126,12 +141,11 @@ export default function Dashboard() {
           },
           {
             id: "products",
-            icon: <Star className="h-4 w-4" />,
+            icon: <ShoppingCart className="h-4 w-4" />,
             label: "Productos",
             subItems: [
-              { id: "product-list", label: "Listado", onClick: handleProductList },
+              { id: "product-list", label: "Lista de productos", onClick: handleProductList },
               { id: "product-categories", label: "Categorías", onClick: handleProductCategories },
-              { id: "product-inventory", label: "Inventario", onClick: handleProductInventory },
             ],
           },
           {
@@ -168,10 +182,16 @@ export default function Dashboard() {
             label: "Ayuda",
             href: "/dashboard/help",
           },
+          {
+            id: "logout",
+            icon: <LogOut className="h-4 w-4" />,
+            label: "Cerrar Sesión",
+            onClick: handleLogout,
+          },
         ],
       },
     ],
-    [handleProductList, handleProductCategories, handleProductInventory, handleUserList, handleUserRoles]
+    [handleProductList, handleProductCategories, handleProductInventory, handleUserList, handleUserRoles, handleLogout]
   )
 
   // Formateador para porcentajes con signo
@@ -183,7 +203,7 @@ export default function Dashboard() {
   return (
     <div className={cn("flex h-screen overflow-hidden", isDarkTheme ? "dark" : "")}>
       {/* Sidebar para desktop (siempre visible) */}
-      <div>
+      <div className="h-full flex-shrink-0">
         <EnhancedSidebar
           variant={sidebarVariant as "default" | "compact"}
           sections={sidebarSections()}
@@ -194,41 +214,10 @@ export default function Dashboard() {
 
       {/* Contenido principal */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Barra superior */}
-        <header className="border-b h-16 flex items-center justify-between px-4">
-          <div className="flex items-center">
-            {/* Logo o título del dashboard */}
-            <div className="font-semibold text-lg mr-4 flex items-center">
-              <Command className="h-5 w-5 mr-2" />
-              <span>Inventario Pro</span>
-            </div>
-
-            {/* Barra de búsqueda */}
-            <div className="w-full max-w-md">
-              <ActionSearchBar />
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {/* Botón de tema */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              aria-label={isDarkTheme ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
-            >
-              {isDarkTheme ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
-
-            {/* Notificaciones */}
-            <Button variant="ghost" size="icon" aria-label="Ver notificaciones">
-              <Bell className="h-5 w-5" />
-            </Button>
-
-            {/* Avatar del usuario */}
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>UD</AvatarFallback>
-            </Avatar>
+        {/* Barra superior - Simplificada para mostrar solo la barra de búsqueda */}
+        <header className="border-b h-16 flex items-center justify-center px-4 bg-card">
+          <div className="w-full max-w-md">
+            <ActionSearchBar />
           </div>
         </header>
 
@@ -245,6 +234,7 @@ export default function Dashboard() {
                     size="icon"
                     onClick={() => setShowWelcomeBanner(false)}
                     aria-label="Cerrar mensaje de bienvenida"
+                    className="active:scale-95"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -254,7 +244,12 @@ export default function Dashboard() {
                 <p className="text-muted-foreground">
                   Este es tu nuevo panel de control. Puedes personalizar esta vista según tus necesidades.
                 </p>
-                <Button variant="outline" size="sm" className="mt-4" onClick={startTour}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 hover:bg-primary hover:text-primary-foreground transition-colors active:scale-95"
+                  onClick={startTour}
+                >
                   Comenzar Tour
                 </Button>
               </div>
@@ -282,7 +277,7 @@ export default function Dashboard() {
               <Button
                 variant="outline"
                 onClick={() => window.location.reload()}
-                className="border-destructive text-destructive hover:bg-destructive/10"
+                className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors active:scale-95"
               >
                 Reintentar
               </Button>
@@ -431,7 +426,7 @@ export default function Dashboard() {
                               <Badge variant="outline" className="bg-amber-50">
                                 Stock: {product.currentStock}
                               </Badge>
-                              <Button size="sm" variant="ghost">
+                              <Button size="sm" variant="ghost" className="active:scale-95">
                                 <ArrowRight className="h-4 w-4" />
                               </Button>
                             </div>
@@ -441,7 +436,12 @@ export default function Dashboard() {
                     )}
                   </CardContent>
                   <CardFooter className="pt-0">
-                    <Button variant="outline" className="w-full">Ver todos los productos</Button>
+                    <Button
+                      variant="outline"
+                      className="w-full hover:bg-primary hover:text-primary-foreground transition-colors active:scale-95"
+                    >
+                      Ver todos los productos
+                    </Button>
                   </CardFooter>
                 </Card>
               </div>

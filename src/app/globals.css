@@ -99,3 +99,15 @@ body {
 #root {
   @apply h-full;
 }
+
+/* Regla para controlar la interactividad de los overlays */
+[data-visible="false"] {
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Asegurar que el contenido principal siempre sea interactivo */
+main {
+  z-index: 1;
+  position: relative;
+}

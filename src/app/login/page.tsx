@@ -38,9 +38,13 @@ export default function LoginPage() {
       await login(email, password);
       toast.success('Inicio de sesión exitoso');
 
+      // Obtener la URL de redirección de los parámetros de la URL (si existe)
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo = params.get('from') || '/dashboard';
+
       // Pequeña pausa para asegurar que el estado se actualice antes de la redirección
       setTimeout(() => {
-        router.push('/');
+        router.push(redirectTo);
       }, 100);
     } catch (error: unknown) {
       console.error('Error de inicio de sesión:', error);

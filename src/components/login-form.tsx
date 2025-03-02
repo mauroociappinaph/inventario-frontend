@@ -37,21 +37,32 @@ export function LoginForm({
 
     try {
       setIsSubmitting(true);
-      await login(email, password);
+
+      // Realizar inicio de sesión
+      const response = await login(email, password);
 
       toast({
         title: "¡Inicio de sesión exitoso!",
         description: "Has iniciado sesión correctamente.",
       });
 
-      // Redirigir a la página principal después de iniciar sesión
-      router.push("/");
+      // Verificar en los datos del usuario si tiene el rol de admin
+      const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+      const userRoles = userData.roles || [];
+      const isAdmin = userRoles.includes('admin');
+
+      // Redirigir según el rol del usuario
+      if (isAdmin) {
+        router.push("/dashboard");
+      } else {
+        router.push("/user-dashboard");
+      }
     } catch (error: any) {
       console.error("Error de inicio de sesión:", error);
 
       toast({
         title: "Error de inicio de sesión",
-        description: error?.response?.data?.message || "Credenciales inválidas. Por favor, intente de nuevo.",
+        description: error?.message || "Credenciales inválidas. Por favor, intente de nuevo.",
         variant: "destructive",
       });
     } finally {

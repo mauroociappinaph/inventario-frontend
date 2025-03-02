@@ -75,6 +75,7 @@ export interface User {
   name: string;
   email: string;
   companyName: string;
+  roles?: string[];
 }
 
 export interface AuthResponse {
@@ -91,33 +92,35 @@ const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
       console.log('Intentando iniciar sesión con:', credentials.email);
-      const response = await api.post<any>('/auth/login', credentials);
+      const response = await api.post<AuthResponse>('/auth/login', credentials);
       console.log('Respuesta login:', response.data);
 
-      const data = response.data.data || response.data;
+      this.saveAuthData(response.data);
 
-      // Guardar el token en localStorage y cookies
-      if (data.token) {
-        // Guardar en localStorage
-        localStorage.setItem('auth_token', data.token);
-
-        // Si hay datos de usuario, guardarlos también
-        if (data.user) {
-          localStorage.setItem('user_data', JSON.stringify(data.user));
-        }
-
-        // Guardar en cookies para que sea accesible por el middleware
-        Cookies.set('auth_token', data.token, {
-          expires: COOKIE_EXPIRY_DAYS,
-          path: '/',
-          sameSite: 'strict'
-        });
-      }
-
-      return data;
+      return response.data;
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
       throw error;
+    }
+  },
+
+  saveAuthData(authData: AuthResponse): void {
+    // Guardar el token en localStorage y cookies
+    if (authData.token) {
+      // Guardar en localStorage
+      localStorage.setItem('auth_token', authData.token);
+
+      // Si hay datos de usuario, guardarlos también
+      if (authData.user) {
+        localStorage.setItem('user_data', JSON.stringify(authData.user));
+      }
+
+      // Guardar en cookies para que sea accesible por el middleware
+      Cookies.set('auth_token', authData.token, {
+        expires: COOKIE_EXPIRY_DAYS,
+        path: '/',
+        sameSite: 'strict'
+      });
     }
   },
 

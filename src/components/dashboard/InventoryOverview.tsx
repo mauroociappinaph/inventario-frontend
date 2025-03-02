@@ -29,7 +29,7 @@ export function InventoryOverview({
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-sm right-sm transition-standard"
+            className="absolute top-sm right-sm transition-standard active:scale-95"
             onClick={() => setShowWelcomeBanner(false)}
             aria-label="Cerrar banner"
           >
@@ -40,10 +40,10 @@ export function InventoryOverview({
             Esta es tu nueva interfaz de gestión de inventario. ¿Te gustaría un recorrido rápido?
           </p>
           <div className="flex flex-wrap gap-sm">
-            <Button size="sm" onClick={startTour} className="transition-standard">
+            <Button size="sm" onClick={startTour} className="transition-standard active:scale-95">
               Iniciar recorrido
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setShowWelcomeBanner(false)} className="transition-standard">
+            <Button size="sm" variant="outline" onClick={() => setShowWelcomeBanner(false)} className="transition-standard active:scale-95">
               Omitir
             </Button>
           </div>
@@ -64,7 +64,7 @@ export function InventoryOverview({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 transition-standard"
+              className="h-8 w-8 transition-standard active:scale-95"
               aria-label="Opciones de gráfico"
             >
               <MoreVertical className="h-4 w-4" />
@@ -91,10 +91,10 @@ export function InventoryOverview({
               <CardTitle className="text-base font-medium">Acciones Rápidas</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-sm card-padding pt-0">
-              <Button size="sm" className="transition-standard">Nuevo Producto</Button>
-              <Button size="sm" variant="outline" className="transition-standard">Exportar Datos</Button>
-              <Button size="sm" variant="secondary" className="transition-standard">Generar Reporte</Button>
-              <Button size="sm" variant="outline" className="transition-standard">Configurar Alertas</Button>
+              <Button size="sm" className="transition-standard active:scale-95">Nuevo Producto</Button>
+              <Button size="sm" variant="outline" className="transition-standard active:scale-95">Exportar Datos</Button>
+              <Button size="sm" variant="secondary" className="transition-standard active:scale-95">Generar Reporte</Button>
+              <Button size="sm" variant="outline" className="transition-standard active:scale-95">Configurar Alertas</Button>
             </CardContent>
           </Card>
 
@@ -142,7 +142,7 @@ export function InventoryOverview({
                   <SelectItem value="ropa">Ropa</SelectItem>
                 </SelectContent>
               </Select>
-              <Button size="sm" variant="outline" className="transition-standard">Aplicar Filtros</Button>
+              <Button size="sm" variant="outline" className="transition-standard active:scale-95">Aplicar Filtros</Button>
             </div>
             <div className="overflow-x-auto">
               {isLoading ? (
@@ -157,10 +157,10 @@ export function InventoryOverview({
               )}
             </div>
             <div className="flex flex-wrap gap-sm mt-md">
-              <Button size="sm" className="bg-primary hover:bg-primary-hover transition-standard">
+              <Button size="sm" className="bg-primary hover:bg-primary-hover transition-standard active:scale-95">
                 Agregar Producto
               </Button>
-              <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10 transition-standard">
+              <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10 transition-standard active:scale-95">
                 Eliminar Seleccionados
               </Button>
             </div>

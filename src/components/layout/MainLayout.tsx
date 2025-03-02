@@ -79,12 +79,7 @@ export function MainLayout({
   return (
     <UIStateProvider>
       <div className="relative flex min-h-screen flex-col">
-        <Header
-          user={user}
-          onMobileMenuToggle={toggleMobileMenu}
-          isDarkTheme={theme === "dark"}
-          onThemeToggle={toggleTheme}
-        />
+        <Header />
         <div className="flex flex-1">
           <EnhancedSidebar
             sidebarSections={sidebarSections}

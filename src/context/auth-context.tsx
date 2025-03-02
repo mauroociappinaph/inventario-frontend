@@ -8,10 +8,11 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<any>;
   register: (userData: any) => Promise<void>;
   logout: (redirect?: boolean) => void;
   error: string | null;
+  isAdmin: boolean;
 }
 
 // Crear el contexto con un valor por defecto
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => {},
   logout: () => {},
   error: null,
+  isAdmin: false,
 });
 
 // Hook personalizado para usar el contexto de autenticación
@@ -33,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Función para cargar el usuario actual desde localStorage o cookies
   const loadUser = async () => {
@@ -44,11 +47,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = authService.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
+
+          // Verificar si el usuario tiene rol de administrador
+          const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+          const userRoles = userData.roles || [];
+          setIsAdmin(userRoles.includes('admin'));
         }
       }
     } catch (err) {
       console.error('Error al cargar el usuario:', err);
-      setError('Error al cargar los datos del usuario');
+      setError(err instanceof Error ? err.message : 'Error al cargar el usuario');
     } finally {
       setLoading(false);
     }
@@ -62,29 +70,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Función para iniciar sesión
   const login = async (email: string, password: string) => {
     try {
-      setLoading(true);
       setError(null);
+      setLoading(true);
+
       const response = await authService.login({ email, password });
 
-      if (response.user) {
-        setUser(response.user);
-      } else {
-        // Si la respuesta no incluye el usuario, intentamos cargarlo
-        loadUser();
-      }
-    } catch (err: any) {
-      console.error('Error al iniciar sesión:', err);
+      // Cargar el usuario con los datos nuevos
+      await loadUser();
 
-      // Extraer mensaje de error más específico si está disponible
-      let errorMessage = 'Error al iniciar sesión';
-
-      if (err?.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err?.message) {
-        errorMessage = err.message;
-      }
-
-      setError(errorMessage);
+      return response;
+    } catch (err) {
+      console.error('Error en login:', err);
+      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
       throw err;
     } finally {
       setLoading(false);
@@ -146,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     error,
+    isAdmin,
   };
 
   return (

@@ -12,7 +12,7 @@ import {
   MessageSquare
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Avatar } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/simple-avatar"
 import { useUIStore, SidebarItem, SidebarSection } from "@/stores/uiStore"
 import { useSidebar } from "@/hooks/useSidebar"
 import { useAppTheme } from "@/hooks/useAppTheme"
@@ -161,6 +161,7 @@ export function EnhancedSidebar({
             }
             ${variant === "compact" && !isSubItem && "h-9 w-9 p-0 flex justify-center"}
             ${isLoading ? "opacity-70 pointer-events-none" : ""}
+            active:scale-95 transition-transform
           `}
           onClick={() => handleItemButtonClick(item.id, item.href, item.onClick)}
           disabled={isLoading}
@@ -252,8 +253,12 @@ export function EnhancedSidebar({
     flex
     flex-col
     text-sidebar-foreground
+    h-full
+    min-h-screen
+    sticky
+    top-0
     ${variant === "compact" ? "w-16" : "w-64"}
-    ${isMobile ? "h-screen fixed top-0 left-0 z-50" : "h-full"}
+    ${isMobile ? "fixed left-0 z-50" : ""}
   `
 
   // Manejar eventos de teclado a nivel de contenedor para navegación entre items
@@ -359,13 +364,13 @@ export function EnhancedSidebar({
           {/* Mostrar información del usuario si está disponible */}
           {userInfo && (
             <div className={`flex items-center ${variant === "compact" ? "justify-center" : "px-sm mb-md"}`}>
-              <Avatar
-                src={userInfo.avatar} // Cambiado de avatarUrl a src
-                alt={userInfo.name}
-                initials={userInfo.initials}
-                size="sm"
-                className="h-8 w-8"
-              />
+              <Avatar className="h-8 w-8">
+                {userInfo.avatar ? (
+                  <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
+                ) : (
+                  <AvatarFallback>{userInfo.initials}</AvatarFallback>
+                )}
+              </Avatar>
 
               {variant !== "compact" && (
                 <div className="ml-sm">
@@ -378,16 +383,16 @@ export function EnhancedSidebar({
 
           {/* Botones de acción en el footer */}
           <div className={`flex ${variant === "compact" ? "flex-col items-center" : "justify-around"} mt-sm`}>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-dim-3 hover:text-sidebar-foreground">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-dim-3 hover:text-sidebar-foreground active:scale-95">
               <Bell className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-dim-3 hover:text-sidebar-foreground">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-dim-3 hover:text-sidebar-foreground active:scale-95">
               <MessageSquare className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-dim-3 hover:text-sidebar-foreground"
+              className="h-8 w-8 text-dim-3 hover:text-sidebar-foreground active:scale-95"
               onClick={toggleTheme}
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

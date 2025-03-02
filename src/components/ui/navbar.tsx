@@ -59,8 +59,23 @@ export function Navbar() {
   // Elementos de navegación fijos (siempre visibles)
   const fixedNavItems = [
     { path: "/", label: "Inicio", icon: <Home className="h-4 w-4" /> },
-    { path: "/inventory", label: "Inventario", icon: <Package className="h-4 w-4" /> },
-    { path: "/dashboard", label: "Dashboard", icon: <BarChart3 className="h-4 w-4" /> },
+    ...(isAuthenticated ? [
+      {
+        path: user?.roles?.includes('admin') ? "/dashboard" : "/user-dashboard",
+        label: "Dashboard",
+        icon: <BarChart3 className="h-4 w-4" />
+      },
+      {
+        path: user?.roles?.includes('admin') ? "/dashboard/inventory" : "/user-dashboard/inventory",
+        label: "Inventario",
+        icon: <Package className="h-4 w-4" />
+      },
+      {
+        path: user?.roles?.includes('admin') ? "/dashboard/products" : "/user-dashboard/products",
+        label: "Productos",
+        icon: <ShoppingCart className="h-4 w-4" />
+      }
+    ] : [])
   ];
 
   // Elementos para usuarios autenticados

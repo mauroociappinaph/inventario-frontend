@@ -85,7 +85,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex gap-2">
-              <Link href="/inventory">
+              <Link href="/dashboard/inventory">
                 <Button variant="outline">
                   <Package className="mr-2 h-4 w-4" /> View Inventory
                 </Button>

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configuración base de axios
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // Crear una instancia de axios con configuración predeterminada
 const api = axios.create({
@@ -35,11 +35,15 @@ api.interceptors.response.use(
     return response.data;
   },
   (error) => {
+    console.error("Error en la petición API:", error);
+
     // Manejar errores comunes
     if (error.response) {
       // El servidor respondió con un código de estado fuera del rango 2xx
       const status = error.response.status;
       const responseData = error.response.data || {};
+
+      console.log("Respuesta de error del servidor:", responseData);
 
       // Si es un error de autenticación (401), redirigir al login
       if (status === 401) {
@@ -67,6 +71,8 @@ api.interceptors.response.use(
       // Esto puede ser un problema de red, servidor caído, o CORS
       const isNetworkError = !window.navigator.onLine;
 
+      console.log("Error de red o servidor:", error.request);
+
       return Promise.reject({
         status: 503,
         message: isNetworkError
@@ -78,6 +84,8 @@ api.interceptors.response.use(
       });
     } else {
       // Algo ocurrió en la configuración de la solicitud que desencadenó un error
+      console.log("Error general de solicitud:", error.message);
+
       return Promise.reject({
         status: 500,
         message: error.message || 'Error al procesar la solicitud.',
@@ -109,6 +117,36 @@ function getStatusMessage(status: number): string {
   return statusMessages[status] || `Error en la solicitud (${status})`;
 }
 
+// Interfaces para tipado
+
+// Tipo para posibles estados de productos
+export type ProductStatus = 'active' | 'inactive'; // Frontend
+export type BackendProductStatus = 'activo' | 'inactivo'; // Backend
+
+// Interfaces para DTOs
+export interface CreateProductDto {
+  name: string;
+  description?: string;
+  price: number;
+  stock: number;
+  entryDate: string; // ISO string
+  category?: string;
+  status?: BackendProductStatus;
+  barcode?: string;
+  minStock?: number;
+}
+
+export interface ErrorResponse {
+  status: number;
+  message: string;
+  errors?: Record<string, string[]>;
+  data?: any;
+  timestamp?: string;
+  path?: string;
+  method?: string;
+  originalError?: string;
+}
+
 // Servicio de autenticación
 export const authService = {
   login: async (credentials: { email: string; password: string }) => {
@@ -132,10 +170,63 @@ export const productService = {
   getProductById: async (id: string) => {
     return api.get(`/products/${id}`);
   },
-  createProduct: async (productData: any) => {
-    return api.post('/products', productData);
+  createProduct: async (productData: Partial<CreateProductDto>) => {
+    try {
+      // Convertir la fecha de entrada a un formato que el backend pueda interpretar como Date
+      let entryDate: Date;
+
+      // Validar y convertir la fecha de entrada
+      if (productData.entryDate) {
+        try {
+          entryDate = new Date(productData.entryDate);
+          // Verificar si es una fecha válida
+          if (isNaN(entryDate.getTime())) {
+            // Si no es válida, usar fecha actual
+            entryDate = new Date();
+          }
+        } catch {
+          // En caso de error al parsear, usar fecha actual
+          entryDate = new Date();
+        }
+      } else {
+        // Si no hay fecha, usar la actual
+        entryDate = new Date();
+      }
+
+      // Creamos un objeto exactamente con la estructura que espera el DTO del backend
+      const dtoData: CreateProductDto = {
+        name: productData.name || '',
+        description: productData.description || `${productData.name} - ${productData.barcode || ''}`,
+        price: Number(productData.price || 0),
+        stock: Number(productData.stock || 0),
+        entryDate: entryDate.toISOString(),
+        category: productData.category || '',
+        status: convertStatusToBackend(productData.status),
+        barcode: productData.barcode || '',
+        minStock: Number(productData.minStock || Math.max(1, Math.floor(Number(productData.stock || 0) * 0.1)))
+      };
+
+      console.log('Enviando datos al backend:', JSON.stringify(dtoData, null, 2));
+
+      const response = await api.post('/products', dtoData);
+      console.log('Respuesta exitosa del backend:', response);
+      return response;
+    } catch (error: unknown) {
+      console.error('Error al crear producto en el backend:', error);
+
+      // Usamos typeof para verificar el tipo antes de acceder a propiedades
+      if (typeof error === 'object' && error !== null && 'response' in error) {
+        const axiosError = error as { response?: { data?: any } };
+        if (axiosError.response?.data) {
+          console.error('Detalles de la respuesta:', axiosError.response.data);
+        }
+      }
+
+      // Re-lanzar el error para que sea manejado por el siguiente nivel
+      throw error;
+    }
   },
-  updateProduct: async (id: string, productData: any) => {
+  updateProduct: async (id: string, productData: Partial<CreateProductDto>) => {
     return api.put(`/products/${id}`, productData);
   },
   deleteProduct: async (id: string) => {
@@ -251,5 +342,16 @@ export const userService = {
     return api.put(`/users/${id}/role`, roleData);
   }
 };
+
+// Funciones de utilidad para convertir estados entre frontend y backend
+export function convertStatusToBackend(status?: ProductStatus | string): BackendProductStatus {
+  if (!status) return 'activo';
+  return status === 'active' ? 'activo' : 'inactivo';
+}
+
+export function convertStatusToFrontend(status?: BackendProductStatus | string): ProductStatus {
+  if (!status) return 'active';
+  return status.toLowerCase() === 'activo' ? 'active' : 'inactive';
+}
 
 export default api;
