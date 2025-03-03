@@ -1,44 +1,40 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/context/auth-context"
 import {
+  AlertTriangle,
+  ArrowUpDown,
+  CheckCircle2,
+  FileBarChart,
+  History,
+  PackageMinus,
   PackageOpen,
   PackagePlus,
-  PackageMinus,
-  History,
-  AlertTriangle,
-  CheckCircle2,
-  SearchIcon,
-  FileBarChart,
-  BarChart,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpDown,
-  Download
+  SearchIcon
 } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState } from "react"
 
 // Tipos para los productos y movimientos
 interface Product {
   id: string
   name: string
-
+  price: number
   category: string
   stock: number
-  minimumStock: number
-  location: string
+  minStock: number
   lastUpdated: string
-  entryDate?: string  // Fecha de entrada
-  exitDate?: string   // Fecha de salida
+  entryDate?: Date   // Fecha de entrada
+  exitDate?: Date   // Fecha de salida
+  lastStockUpdate: Date
 }
 
 interface StockMovement {
@@ -59,60 +55,8 @@ export default function UserInventoryPage() {
   // Los usuarios normales no son administradores
   const isAdmin = false
 
-
-
-  const [stockMovements, setStockMovements] = useState<StockMovement[]>([
-    {
-      id: "1",
-      productId: "1",
-      productName: "Laptop HP Pavilion",
-      type: "entry",
-      quantity: 5,
-      reason: "Compra a proveedor",
-      date: "2023-10-15T14:30:00Z",
-      user: "Juan Pérez"
-    },
-    {
-      id: "2",
-      productId: "2",
-      productName: "Monitor Samsung 27\"",
-      type: "exit",
-      quantity: 2,
-      reason: "Venta",
-      date: "2023-10-12T09:45:00Z",
-      user: "María López"
-    },
-    {
-      id: "3",
-      productId: "3",
-      productName: "Teclado Mecánico RGB",
-      type: "entry",
-      quantity: 10,
-      reason: "Devolución",
-      date: "2023-10-10T11:20:00Z",
-      user: "Pedro Gómez"
-    },
-    {
-      id: "4",
-      productId: "4",
-      productName: "Mouse Inalámbrico",
-      type: "exit",
-      quantity: 3,
-      reason: "Venta",
-      date: "2023-10-08T16:15:00Z",
-      user: "Ana Rodríguez"
-    },
-    {
-      id: "5",
-      productId: "5",
-      productName: "Audífonos Bluetooth",
-      type: "adjustment",
-      quantity: -2,
-      reason: "Inventario físico",
-      date: "2023-10-05T13:10:00Z",
-      user: "Carlos Martínez"
-    }
-  ])
+  const [products, setProducts] = useState<Product[]>([])
+  const [stockMovements, setStockMovements] = useState<StockMovement[]>([])
 
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
@@ -129,13 +73,13 @@ export default function UserInventoryPage() {
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false)
   const [newProduct, setNewProduct] = useState({
     name: "",
-
     category: "",
     minimumStock: 0,
     stock: 0,
     location: "",
     entryDate: "",
-    exitDate: ""
+    exitDate: "",
+    price: 0
   })
 
   // Obtener categorías únicas para el filtro
@@ -143,7 +87,7 @@ export default function UserInventoryPage() {
 
   // Calcular estadísticas de inventario
   const totalProducts = products.length
-  const lowStockProducts = products.filter(p => p.stock <= p.minimumStock).length
+  const lowStockProducts = products.filter(p => p.stock <= p.minStock).length
   const totalStock = products.reduce((sum, p) => sum + p.stock, 0)
   const criticalStockPercentage = (lowStockProducts / totalProducts) * 100
 
@@ -160,13 +104,12 @@ export default function UserInventoryPage() {
   // Filtrar y ordenar productos
   const filteredProducts = products
     .filter(product  => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
 
-                           product.location.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter
       const matchesStock = stockFilter === "all" ||
-                          (stockFilter === "low" && product.stock <= product.minimumStock) ||
-                          (stockFilter === "normal" && product.stock > product.minimumStock)
+                          (stockFilter === "low" && product.stock <= product.minStock) ||
+                          (stockFilter === "normal" && product.stock > product.minStock)
 
       return matchesSearch && matchesCategory && matchesStock
     })
@@ -256,7 +199,7 @@ export default function UserInventoryPage() {
         icon: <AlertTriangle size={14} className="text-destructive" />,
         text: "Sin stock"
       }
-    } else if (product.stock <= product.minimumStock) {
+    } else if (product.stock <= product.minStock) {
       return {
         color: "text-amber-600",
         bgColor: "bg-amber-100",
@@ -294,14 +237,14 @@ export default function UserInventoryPage() {
     const productToAdd: Product = {
       id: newId,
       name: newProduct.name,
-
       category: newProduct.category,
+      price: newProduct.price,
       stock: newProduct.stock,
-      minimumStock: newProduct.minimumStock,
-      location: newProduct.location,
-      lastUpdated: new Date().toISOString(),
-      entryDate: newProduct.entryDate,
-      exitDate: newProduct.exitDate
+      minStock: newProduct.minimumStock,
+      lastStockUpdate: new Date(),
+      entryDate: new Date(newProduct.entryDate),
+      exitDate: new Date(newProduct.exitDate),
+      lastUpdated: new Date().toISOString()
     }
 
     // Añadir el producto a la lista
@@ -310,13 +253,13 @@ export default function UserInventoryPage() {
     // Reiniciar el formulario
     setNewProduct({
       name: "",
-
       category: "",
       minimumStock: 0,
       stock: 0,
       location: "",
       entryDate: "",
-      exitDate: ""
+      exitDate: "",
+      price: 0
     })
 
     // Cerrar el diálogo
@@ -502,10 +445,23 @@ export default function UserInventoryPage() {
                           </button>
                         </th>
                         <th className="py-3 px-4 text-left">
-
+                          <button
+                            className="flex items-center gap-1"
+                            onClick={() => handleSort("price")}
+                          >
+                            Precio
+                            <ArrowUpDown size={14} className="text-muted-foreground" />
+                          </button>
                         </th>
-                        <th className="py-3 px-4 text-left hidden md:table-cell">Categoría</th>
-                        <th className="py-3 px-4 text-left hidden lg:table-cell">Ubicación</th>
+                        <th className="py-3 px-4 text-left hidden md:table-cell">
+                          <button
+                            className="flex items-center gap-1"
+                            onClick={() => handleSort("category")}
+                          >
+                            Categoría
+                            <ArrowUpDown size={14} className="text-muted-foreground" />
+                          </button>
+                        </th>
                         <th className="py-3 px-4 text-left">
                           <button
                             className="flex items-center gap-1"
@@ -516,6 +472,7 @@ export default function UserInventoryPage() {
                           </button>
                         </th>
                         <th className="py-3 px-4 text-left hidden lg:table-cell">Estado</th>
+                        <th className="py-3 px-4 text-left hidden lg:table-cell">Última Actualización</th>
                         <th className="py-3 px-4 text-right">Acciones</th>
                       </tr>
                     </thead>
@@ -527,18 +484,19 @@ export default function UserInventoryPage() {
                           </td>
                         </tr>
                       ) : (
-                        filteredProducts.map((product: any) => {
+                        filteredProducts.map((product: Product) => {
                           const stockStatus = getStockStatusInfo(product)
                           return (
                             <tr key={product.id} className="border-b transition-colors hover:bg-muted/50">
                               <td className="py-3 px-4 font-medium">{product.name}</td>
-
+                              <td className="py-3 px-4">
+                                ${product.price.toFixed(2)}
+                              </td>
                               <td className="py-3 px-4 hidden md:table-cell">
                                 <Badge variant="outline" className="font-normal">
                                   {product.category}
                                 </Badge>
                               </td>
-                              <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">{product.location}</td>
                               <td className="py-3 px-4 font-semibold">
                                 <span className={stockStatus.color}>{product.stock}</span>
                               </td>
@@ -550,6 +508,9 @@ export default function UserInventoryPage() {
                                   {stockStatus.icon}
                                   <span className={stockStatus.color}>{stockStatus.text}</span>
                                 </Badge>
+                              </td>
+                              <td className="py-3 px-4 hidden lg:table-cell text-muted-foreground">
+                                {formatDate(product.lastUpdated)}
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <div className="flex justify-end gap-2">
@@ -733,10 +694,6 @@ export default function UserInventoryPage() {
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-
-
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="text-right">
                 Categoría
               </Label>
@@ -772,6 +729,20 @@ export default function UserInventoryPage() {
                 onChange={(e) => setNewProduct({...newProduct, minimumStock: parseInt(e.target.value) || 0})}
                 className="col-span-3"
                 min="0"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="price" className="text-right">
+                Precio
+              </Label>
+              <Input
+                id="price"
+                type="number"
+                value={newProduct.price || ""}
+                onChange={(e) => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})}
+                className="col-span-3"
+                min="0"
+                step="0.01"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
