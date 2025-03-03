@@ -1,12 +1,12 @@
 'use client';
 
-import Link from "next/link"
-import { Package, Database, BarChart3, Settings, User, FileText, ShieldCheck, TrendingUp, ArrowRight, Clock, BarChart2, PackageCheck } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { PageTransition } from '@/components/layout/page-transition'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { useAuth } from "@/context/auth-context"
+import { PageTransition } from '@/components/layout/page-transition';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/context/auth-context";
+import { ArrowRight, BarChart2, BarChart3, Clock, Package, PackageCheck, ShieldCheck, TrendingUp, User } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
@@ -35,9 +35,9 @@ export default function Home() {
           Administra todo tu inventario desde un solo lugar. Controla stock, productos y movimientos con una interfaz moderna y fácil de usar.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
-          <Link href={dashboardPath}>
+          <Link href={"/login"}>
             <Button size="lg" className="gap-2 active:scale-95">
-              Ir al Dashboard <ArrowRight className="h-4 w-4" />
+              Iniciar Sesión <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
           {!isAuthenticated && (
