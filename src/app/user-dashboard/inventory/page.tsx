@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -79,7 +79,6 @@ export default function UserInventoryPage() {
     category: "",
     minimumStock: 0,
     stock: 0,
-    location: "",
     entryDate: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD para input date
     exitDate: "",
     price: 0
@@ -88,11 +87,15 @@ export default function UserInventoryPage() {
   // Obtener categorías únicas para el filtro
   const categories = Array.from(new Set(products.map(p => p.category)))
 
-  // Calcular estadísticas de inventario
-  const totalProducts = products.length
-  const lowStockProducts = products.filter(p => p.stock <= p.minStock).length
-  const totalStock = products.reduce((sum, p) => sum + p.stock, 0)
-  const criticalStockPercentage = totalProducts > 0 ? (lowStockProducts / totalProducts) * 100 : 0
+  // Usar useMemo para cálculos costosos
+  const statistics = useMemo(() => ({
+    totalProducts: products.length,
+    lowStockProducts: products.filter(p => p.stock <= p.minStock).length,
+    totalStock: products.reduce((sum, p) => sum + p.stock, 0),
+    criticalStockPercentage: products.length > 0
+      ? (products.filter(p => p.stock <= p.minStock).length / products.length) * 100
+      : 0
+  }), [products])
 
   // Función para manejar el ordenamiento
   const handleSort = (field: string) => {
@@ -149,7 +152,7 @@ export default function UserInventoryPage() {
       } else {
         setProducts([])
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al obtener productos:", error)
       toast({
         title: "Error",
@@ -310,7 +313,7 @@ export default function UserInventoryPage() {
         category: "",
         minimumStock: 0,
         stock: 0,
-        location: "",
+
         entryDate: new Date().toISOString().split('T')[0],
         exitDate: "",
         price: 0
@@ -321,15 +324,37 @@ export default function UserInventoryPage() {
         title: "Producto añadido",
         description: `Se ha añadido "${productToAdd.name}" al inventario.`
       })
-    } catch (error) {
-      console.error("Error al crear producto:", error)
-      toast({
-        title: "Error al crear producto",
-        description: "No se pudo agregar el producto. Intente nuevamente.",
-        variant: "destructive"
-      })
+    } catch (error: any) {
+      if (error.response?.status === 409) {
+        toast({
+          title: "Producto duplicado",
+          description: "Ya existe un producto con este nombre."
+        })
+      } else {
+        console.error("Error al crear producto:", error)
+        toast({
+          title: "Error al crear producto",
+          description: "No se pudo agregar el producto. Intente nuevamente.",
+          variant: "destructive"
+        })
+      }
     }
   }
+
+  // Agregar loading states
+  const [isLoading, setIsLoading] = useState({
+    products: false,
+    movements: false,
+    addProduct: false
+  });
+
+  // Agregar validaciones más robustas
+  const validateProduct = (product: Partial<CreateProductDto>) => {
+    if (!product.name?.trim()) return "El nombre es requerido";
+    if (typeof product.stock === 'number' && product.stock < 0) return "El stock no puede ser negativo";
+    if (typeof product.price === 'number' && product.price < 0) return "El precio no puede ser negativo";
+    return null;
+  };
 
   return (
     <div className="container mx-auto py-6 space-y-8">
@@ -367,7 +392,7 @@ export default function UserInventoryPage() {
             <CardTitle className="text-sm font-medium">Total de Productos</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProducts}</div>
+            <div className="text-2xl font-bold">{statistics.totalProducts}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Productos en inventario
             </p>
@@ -380,18 +405,18 @@ export default function UserInventoryPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center">
-              <div className="text-2xl font-bold">{lowStockProducts}</div>
+              <div className="text-2xl font-bold">{statistics.lowStockProducts}</div>
               <Badge
                 variant="outline"
                 className={`ml-2 ${
-                  criticalStockPercentage > 30
+                  statistics.criticalStockPercentage > 30
                     ? "bg-red-100 text-red-800"
-                    : criticalStockPercentage > 15
+                    : statistics.criticalStockPercentage > 15
                     ? "bg-amber-100 text-amber-800"
                     : "bg-green-100 text-green-800"
                 }`}
               >
-                {criticalStockPercentage.toFixed(0)}%
+                {statistics.criticalStockPercentage.toFixed(0)}%
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -405,7 +430,7 @@ export default function UserInventoryPage() {
             <CardTitle className="text-sm font-medium">Total en Inventario</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalStock}</div>
+            <div className="text-2xl font-bold">{statistics.totalStock}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Unidades totales en stock
             </p>
@@ -463,8 +488,8 @@ export default function UserInventoryPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
-                      {categories.map((category) => (
-                        <SelectItem key={`category-${category}`} value={category}>
+                      {categories.map((category, index) => (
+                        <SelectItem key={`category-${category || index}`} value={category}>
                           {category}
                         </SelectItem>
                       ))}
@@ -556,10 +581,10 @@ export default function UserInventoryPage() {
                           </td>
                         </tr>
                       ) : (
-                        filteredProducts.map((product: Product) => {
+                        filteredProducts.map((product: Product, index) => {
                           const stockStatus = getStockStatusInfo(product)
                           return (
-                            <tr key={`product-${product.id}`} className="border-b transition-colors hover:bg-muted/50">
+                            <tr key={`product-${product.id || index}-${Date.now()}`} className="border-b transition-colors hover:bg-muted/50">
                               <td className="py-3 px-4 font-medium">{product.name}</td>
                               <td className="py-3 px-4">${product.price.toFixed(2)}</td>
                               <td className="py-3 px-4 hidden md:table-cell">
@@ -648,8 +673,8 @@ export default function UserInventoryPage() {
                       ) : (
                         sortedMovements
                           .filter(m => m.user === user?.name && m.type === "exit")
-                          .map((movement) => (
-                            <tr key={`movement-${movement.id}`} className="border-b transition-colors hover:bg-muted/50">
+                          .map((movement, index) => (
+                            <tr key={`movement-${movement.id || index}-${Date.now()}`} className="border-b transition-colors hover:bg-muted/50">
                               <td className="py-3 px-4 whitespace-nowrap">{formatDate(movement.date)}</td>
                               <td className="py-3 px-4 font-medium">{movement.productName}</td>
                               <td className="py-3 px-4 font-semibold">{movement.quantity}</td>
@@ -813,18 +838,7 @@ export default function UserInventoryPage() {
                 step="0.01"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="location" className="text-right">
-                Ubicación
-              </Label>
-              <Input
-                id="location"
-                value={newProduct.location}
-                onChange={(e) => setNewProduct({ ...newProduct, location: e.target.value })}
-                className="col-span-3"
-                placeholder="Ej: Almacén A - Estantería 3"
-              />
-            </div>
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="entryDate" className="text-right">
                 Fecha de Entrada

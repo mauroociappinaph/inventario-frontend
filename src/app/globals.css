@@ -2,93 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Modo claro - Paleta Sky */
-  --background: 204 100% 97%; /* sky-50 */
-  --foreground: 212 100% 25%; /* sky-900 */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
 
-  --card: 204 100% 97%; /* sky-50 */
-  --card-foreground: 212 100% 25%; /* sky-900 */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
 
-  --popover: 204 100% 97%; /* sky-50 */
-  --popover-foreground: 212 100% 25%; /* sky-900 */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
 
-  --primary: 203 83% 36%; /* sky-700 */
-  --primary-foreground: 204 100% 97%; /* sky-50 */
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
 
-  --secondary: 202 80% 85%; /* sky-200 */
-  --secondary-foreground: 203 83% 36%; /* sky-700 */
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-  --muted: 201 94% 86%; /* sky-100 */
-  --muted-foreground: 203 87% 25%; /* sky-800 */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
-  --accent: 202 80% 76%; /* sky-300 */
-  --accent-foreground: 203 87% 25%; /* sky-800 */
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
 
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 204 100% 97%; /* sky-50 */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
 
-  --success: 142 76% 36%;
-  --success-foreground: 204 100% 97%; /* sky-50 */
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
 
-  --warning: 38 92% 50%;
-  --warning-foreground: 204 100% 97%; /* sky-50 */
+    --radius: 0.5rem;
+  }
 
-  --info: 201 94% 86%; /* sky-100 */
-  --info-foreground: 212 100% 25%; /* sky-900 */
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
 
-  --border: 202 80% 85%; /* sky-200 */
-  --input: 202 80% 85%; /* sky-200 */
-  --ring: 204 96% 53%; /* sky-500 */
-  --radius: 0.5rem;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
 }
 
-.dark {
-  /* Modo oscuro - Paleta Sky */
-  --background: 217 91% 15%; /* sky-950 */
-  --foreground: 201 94% 86%; /* sky-100 */
-
-  --card: 214 100% 20%; /* sky-900 */
-  --card-foreground: 201 94% 86%; /* sky-100 */
-
-  --popover: 214 100% 20%; /* sky-900 */
-  --popover-foreground: 201 94% 86%; /* sky-100 */
-
-  --primary: 204 96% 71%; /* sky-400 */
-  --primary-foreground: 215 100% 30%; /* sky-800 */
-
-  --secondary: 204 100% 40%; /* sky-600 */
-  --secondary-foreground: 201 94% 86%; /* sky-100 */
-
-  --muted: 217 91% 15%; /* sky-950 */
-  --muted-foreground: 202 80% 76%; /* sky-300 */
-
-  --accent: 204 100% 40%; /* sky-600 */
-  --accent-foreground: 201 94% 86%; /* sky-100 */
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 201 94% 86%; /* sky-100 */
-
-  --success: 142 76% 29%;
-  --success-foreground: 201 94% 86%; /* sky-100 */
-
-  --warning: 38 92% 48%;
-  --warning-foreground: 201 94% 86%; /* sky-100 */
-
-  --info: 204 96% 71%; /* sky-400 */
-  --info-foreground: 215 100% 30%; /* sky-800 */
-
-  --border: 204 100% 40%; /* sky-600 */
-  --input: 204 100% 40%; /* sky-600 */
-  --ring: 204 96% 71%; /* sky-400 */
-}
-
-* {
-  @apply border-border;
-}
-
-body {
-  @apply bg-background text-foreground;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
 html,
