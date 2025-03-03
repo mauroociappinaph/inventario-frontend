@@ -2,8 +2,8 @@
 
 import { useThemeShortcut } from '@/hooks/useThemeShortcut';
 
-export function ThemeShortcutClient() {
-  // Aplicamos directamente los atajos de teclado
+export function ClientThemeHandler() {
+  // Activa los atajos de teclado para el tema
   useThemeShortcut();
 
   // Este componente no renderiza nada visualmente
