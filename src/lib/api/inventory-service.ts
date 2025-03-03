@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { useLoading } from '@/hooks/useLoading';
 
 // Obtener la URL base de la API desde las variables de entorno
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -27,12 +26,51 @@ api.interceptors.request.use((config) => {
 export interface InventoryProduct {
   id: string;
   name: string;
-
   category: string;
   stock: number;
   price: number;
   supplier: string;
   lastUpdated: string;
+}
+
+// Interfaz para las estadísticas de inventario
+export interface InventoryStats {
+  general: {
+    totalProducts: number;
+    activeProducts: number;
+    lowStockProducts: number;
+    stockValue: number;
+  };
+  movement: {
+    totalMovements: number;
+    entriesCount: number;
+    exitsCount: number;
+    transfersCount: number;
+  };
+  topMovedProducts: {
+    productId: string;
+    productName: string;
+    totalQuantity: number;
+    entriesCount: number;
+    exitsCount: number;
+  }[];
+  stockByCategory: {
+    category: string;
+    itemCount: number;
+    totalStock: number;
+    totalValue: number;
+  }[];
+  roi?: {
+    avgRoi: number;
+    topRoiProducts?: {
+      _id: string;
+      productName: string;
+      totalSalidas: number;
+      totalValorSalidas: number;
+      costoPromedio: number;
+      roi: number;
+    }[];
+  };
 }
 
 // Servicio para operaciones de inventario
@@ -95,11 +133,43 @@ const inventoryService = {
   // Obtener estadísticas del inventario
   async getStatistics() {
     try {
-      const response = await api.get('/inventory/statistics');
+      console.log('🔍 [InventoryService] Solicitando estadísticas de inventario filtradas por usuario actual...');
+      const response = await api.get<InventoryStats>('/inventory/statistics');
+      console.log('📊 [InventoryService] Estadísticas recibidas:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error al obtener estadísticas:', error);
-      throw error;
+      console.error('❌ [InventoryService] Error al obtener estadísticas:', error);
+      // Devolver datos de respaldo en caso de error
+      return {
+        general: {
+          totalProducts: 0,
+          activeProducts: 0,
+          lowStockProducts: 0,
+          stockValue: 0
+        },
+        movement: {
+          totalMovements: 0,
+          entriesCount: 0,
+          exitsCount: 0,
+          transfersCount: 0
+        },
+        topMovedProducts: [],
+        stockByCategory: [],
+        roi: { avgRoi: 0, topRoiProducts: [] }
+      };
+    }
+  },
+
+  // Obtener estadísticas de ROI
+  async getRoiStatistics() {
+    try {
+      console.log('🔍 [InventoryService] Solicitando estadísticas de ROI filtradas por usuario actual...');
+      const response = await api.get('/inventory/statistics/roi');
+      console.log('📊 [InventoryService] Estadísticas de ROI recibidas:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ [InventoryService] Error al obtener estadísticas de ROI:', error);
+      return { avgRoi: 0, topRoiProducts: [] };
     }
   }
 };

@@ -1,13 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
-import { CircularProgress } from "../circular-progress"
-import { dashboardService, type ProductStats, type InventoryStats } from "@/lib/api/dashboard-service"
-import { useRouter } from "next/navigation"
-import axios, { AxiosError } from "axios"
 import authService from "@/lib/api/auth-service"
+import { dashboardService, type InventoryStats, type ProductStats } from "@/lib/api/dashboard-service"
+import inventoryService from "@/lib/api/inventory-service"
+import axios, { AxiosError } from "axios"
+import { AlertCircle, Info } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { CircularProgress } from "../circular-progress"
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { Button } from "../ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 
 type StatsProps = {
   isLoading: boolean
@@ -21,6 +24,7 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
   const [productStats, setProductStats] = useState<ProductStats | null>(null)
   const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null)
   const [needsLogin, setNeedsLogin] = useState<boolean>(false)
+  const [noUserData, setNoUserData] = useState<boolean>(false)
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -37,9 +41,27 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
 
         setNeedsLogin(false)
 
+        // Intenta obtener las estadísticas filtradas por usuario
+        const inventoryUserStats = await inventoryService.getStatistics();
+        console.log('📊 [DashboardStats] Estadísticas de usuario recibidas:', inventoryUserStats);
+
+        // Verificar si no hay movimientos de usuario
+        const hasUserMovements =
+          inventoryUserStats?.movement?.totalMovements > 0 ||
+          inventoryUserStats?.movement?.entriesCount > 0 ||
+          inventoryUserStats?.movement?.exitsCount > 0;
+
+        if (!hasUserMovements) {
+          console.log('ℹ️ [DashboardStats] No se encontraron movimientos para el usuario actual');
+          setNoUserData(true);
+        } else {
+          setNoUserData(false);
+        }
+
+        // De todas formas, obtiene las estadísticas generales para mostrar algo
         const data = await dashboardService.getDashboardStats()
         setProductStats(data.products)
-        setInventoryStats(data.inventory)
+        setInventoryStats(inventoryUserStats || data.inventory)
       } catch (err: unknown) {
         console.error("Error al cargar estadísticas:", err)
 
@@ -163,12 +185,27 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
 
   return (
     <>
+      {noUserData && (
+        <div className="col-span-3 mb-4">
+          <Alert variant="info" className="bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertTitle className="text-blue-800">Estadísticas personales</AlertTitle>
+            <AlertDescription className="text-blue-700">
+              No tienes movimientos de inventario registrados. Las estadísticas muestran datos generales del sistema.
+              Crea movimientos de entrada o salida para ver tus estadísticas personales.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       {/* Total Products */}
       <Card className="transition-standard">
         <CardHeader className="card-header">
-          <CardTitle className="text-base font-medium">Productos Registrados</CardTitle>
+          <CardTitle className="text-base font-medium">
+            {noUserData ? 'Productos Registrados' : 'Mis Productos Registrados'}
+          </CardTitle>
           <div className="text-xs text-muted-foreground">
-            Comparado con el período anterior
+            {noUserData ? 'Total en el sistema' : 'Gestionados por ti'}
           </div>
         </CardHeader>
         <CardContent className="card-content">
@@ -275,6 +312,61 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
         </CardContent>
       </Card>
 
+      {/* Inventory Statistics */}
+      <Card className="transition-standard">
+        <CardHeader className="card-header">
+          <CardTitle className="text-base font-medium">
+            {noUserData ? 'Estadísticas de Inventario' : 'Mis Estadísticas de Inventario'}
+          </CardTitle>
+          <div className="text-xs text-muted-foreground">
+            {noUserData ? 'Visión general del sistema' : 'Basado en tus movimientos'}
+          </div>
+        </CardHeader>
+        <CardContent className="card-content">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold">
+                {inventoryStats?.movement?.totalMovements || 0}
+              </div>
+              <div className="text-sm text-muted-foreground">Movimientos totales</div>
+
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-sm font-medium">Entradas</div>
+                  <div className="text-xl">
+                    {inventoryStats?.movement?.entriesCount || 0}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium">Salidas</div>
+                  <div className="text-xl">
+                    {inventoryStats?.movement?.exitsCount || 0}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="w-16 h-16 flex-shrink-0">
+              <CircularProgress
+                value={inventoryStats?.general?.activeProducts && inventoryStats?.general?.totalProducts
+                  ? (inventoryStats.general.activeProducts / inventoryStats.general.totalProducts) * 100
+                  : 0}
+                color="var(--primary)"
+                size="lg"
+              />
+            </div>
+          </div>
+
+          {noUserData && (
+            <div className="mt-4 pt-4 border-t">
+              <div className="text-xs text-amber-700 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                <span>No tienes movimientos registrados</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Revenue Card */}
       <Card className="transition-standard">
         <CardHeader className="card-header">
@@ -308,26 +400,6 @@ export function DashboardStats({ isLoading: initialLoading, error: initialError 
                     <div className="text-xs font-medium">${product.price.toLocaleString()}</div>
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {inventoryStats && (
-            <div className="mt-4 pt-4 border-t">
-              <div className="text-sm font-medium mb-2">Movimientos (30 días)</div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="text-center p-2 bg-primary/10 rounded">
-                  <div className="text-xs text-muted-foreground">Entradas</div>
-                  <div className="font-medium">{inventoryStats?.movement?.entriesCount || 0}</div>
-                </div>
-                <div className="text-center p-2 bg-primary/10 rounded">
-                  <div className="text-xs text-muted-foreground">Salidas</div>
-                  <div className="font-medium">{inventoryStats?.movement?.exitsCount || 0}</div>
-                </div>
-                <div className="text-center p-2 bg-primary/10 rounded">
-                  <div className="text-xs text-muted-foreground">Total</div>
-                  <div className="font-medium">{inventoryStats?.movement?.totalMovements || 0}</div>
-                </div>
               </div>
             </div>
           )}

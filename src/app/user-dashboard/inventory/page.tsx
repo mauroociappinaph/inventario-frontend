@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,26 +8,32 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/context/auth-context"
 import {
   AlertTriangle,
   ArrowUpDown,
   CheckCircle2,
+  DollarSign,
   FileBarChart,
   History,
+  Loader2,
+  Package,
   PackageMinus,
   PackageOpen,
   PackagePlus,
   SearchIcon
 } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 
 // Importamos el servicio de productos y el tipo para crear productos
-import { productService, CreateProductDto } from "@/lib/api/api"
+import { CreateProductDto, inventoryService, productService } from "@/lib/api/api"
 
 // Tipos para los productos y movimientos
 interface Product {
   id: string
+  _id?: string // ID original del backend
   name: string
   price: number
   category: string
@@ -38,6 +43,7 @@ interface Product {
   entryDate?: string
   exitDate?: string
   lastStockUpdate: string
+
 }
 
 interface StockMovement {
@@ -65,10 +71,11 @@ export default function UserInventoryPage() {
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [stockFilter, setStockFilter] = useState("all")
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [movementType, setMovementType] = useState<"entry" | "exit" | "adjustment">("entry")
+  const [isMovementDialogOpen, setIsMovementDialogOpen] = useState(false)
+  const [movementType, setMovementType] = useState<"entry" | "exit" | "adjustment">("exit")
   const [movementQuantity, setMovementQuantity] = useState(1)
   const [movementReason, setMovementReason] = useState("")
-  const [isMovementDialogOpen, setIsMovementDialogOpen] = useState(false)
+  const [isCreatingMovement, setIsCreatingMovement] = useState(false)
   const [sortBy, setSortBy] = useState("name")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
 
@@ -148,7 +155,39 @@ export default function UserInventoryPage() {
       // Se utiliza una paginación amplia para obtener todos los productos del usuario
       const response = await productService.getProducts(1, 100, user.id)
       if (response.data && Array.isArray(response.data.products)) {
-        setProducts(response.data.products)
+        // Transformar los productos para asegurar que los IDs sean válidos
+        const transformedProducts = response.data.products.map((product: any) => {
+          // Asegurarse que el ID sea una cadena y tenga el formato correcto
+          let productId = product._id || product.id;
+
+          // Si hay _id pero no id, usamos _id como id
+          if (product._id && !product.id) {
+            productId = product._id;
+          }
+
+          // Asegurarse que el ID sea una cadena
+          if (typeof productId !== 'string') {
+            productId = String(productId);
+          }
+
+          return {
+            ...product,
+            id: productId, // Aseguramos que siempre haya un ID y sea string
+          };
+        });
+
+        // Mostrar información de los primeros 3 productos para depuración
+        if (transformedProducts.length > 0) {
+          console.log("Primeros productos transformados:",
+            transformedProducts.slice(0, 3).map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              validId: /^[0-9a-fA-F]{24}$/.test(p.id)
+            }))
+          );
+        }
+
+        setProducts(transformedProducts)
       } else {
         setProducts([])
       }
@@ -169,57 +208,152 @@ export default function UserInventoryPage() {
   }, [user])
 
   // Función para abrir el diálogo de movimientos (solo salidas para usuarios normales)
-  const openMovementDialog = (product: Product, type: "exit") => {
-    setSelectedProduct(product)
+  const openMovementDialog = (product: Product, type: "entry" | "exit") => {
+    console.log(`Abriendo diálogo para ${type} del producto:`, product);
+
+    // Aseguramos que el ID es válido antes de continuar
+    let correctedProduct = { ...product };
+
+    if (product._id && /^[0-9a-fA-F]{24}$/.test(product._id)) {
+      console.log("Usando _id del backend como ID principal");
+      correctedProduct.id = product._id;
+    } else if (!/^[0-9a-fA-F]{24}$/.test(product.id)) {
+      console.error("ID de producto inválido:", product.id);
+      toast({
+        title: "Error de formato",
+        description: "El ID del producto no tiene un formato válido para MongoDB.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSelectedProduct(correctedProduct)
+    // Establecemos el tipo según lo que se pasa (entry o exit)
     setMovementType(type)
     setMovementQuantity(1)
     setMovementReason("")
     setIsMovementDialogOpen(true)
+
+    // Cambiamos el título del diálogo según el tipo de movimiento
+    if (type === "entry") {
+      setDialogTitle("Agregar productos al inventario")
+      setDialogDescription("Complete los campos para registrar la entrada de productos.")
+    } else {
+      setDialogTitle("Registrar consumo de inventario")
+      setDialogDescription("Complete los campos para registrar el consumo de productos.")
+    }
   }
 
   // Función para registrar un movimiento de inventario
-  const handleStockMovement = () => {
+  const handleStockMovement = async () => {
     if (!selectedProduct) return
 
-    if (selectedProduct.stock < movementQuantity) {
+    if (!user?.id) {
       toast({
-        title: "Error de stock",
-        description: "No hay suficiente stock para realizar esta operación.",
+        title: "Error de autenticación",
+        description: "Por favor inicie sesión para realizar movimientos de inventario.",
         variant: "destructive"
       })
       return
     }
 
-    const newMovement: StockMovement = {
-      id: (Math.max(...stockMovements.map(m => parseInt(m.id))) + 1).toString(),
-      productId: selectedProduct.id,
-      productName: selectedProduct.name,
-      type: "exit",
-      quantity: movementQuantity,
-      reason: movementReason,
-      date: new Date().toISOString(),
-      user: user?.name || "Usuario"
-    }
+    setIsCreatingMovement(true)
 
-    // Actualizamos el stock del producto
-    setProducts(products.map(p => {
-      if (p.id === selectedProduct.id) {
-        return {
-          ...p,
-          stock: p.stock - movementQuantity,
-          lastUpdated: new Date().toISOString()
-        }
+    try {
+      const productId = selectedProduct._id || selectedProduct.id;
+
+      // Comprobar que el ID del producto tiene formato válido (24 caracteres hexadecimales)
+      const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(productId);
+      console.log("¿Es un ID de MongoDB válido?", isValidObjectId);
+
+      // Si el ID no tiene formato válido de MongoDB, mostramos un error
+      if (!isValidObjectId) {
+        toast({
+          title: "Error de formato",
+          description: "El ID del producto no tiene un formato válido para MongoDB.",
+          variant: "destructive"
+        })
+        return
       }
-      return p
-    }))
 
-    // Agregamos el movimiento al historial
-    setStockMovements([...stockMovements, newMovement])
-    setIsMovementDialogOpen(false)
-    toast({
-      title: "Salida registrada",
-      description: `Se ha registrado una salida de ${movementQuantity} unidades de ${selectedProduct.name}.`
-    })
+      // Verificamos si hay stock suficiente para un movimiento de salida
+      if (movementType === "exit" && movementQuantity > selectedProduct.stock) {
+        toast({
+          title: "Stock insuficiente",
+          description: `No hay suficiente stock disponible. Stock actual: ${selectedProduct.stock}, Cantidad solicitada: ${movementQuantity}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Creamos un objeto explícito para asegurarnos que todos los campos se envían correctamente
+      const movementData = {
+        productId: productId, // Usamos el ID correcto
+        productName: selectedProduct.name,
+        quantity: movementQuantity,
+        movementType: movementType === "entry" ? "in" : "out", // Convertimos el tipo al formato del backend
+        type: movementType, // Mantenemos el tipo interno para la UI
+        movementDate: new Date().toISOString(),
+        date: new Date().toISOString(), // Campo adicional para asegurarnos que coincida con el esquema
+        userId: user.id,
+        userName: user.name || "Usuario",
+        notes: movementReason
+      };
+
+      console.log("Enviando movimiento a la API:", JSON.stringify(movementData));
+
+      // Llamar a la API para crear el movimiento
+      const response = await inventoryService.createInventoryMovement(movementData);
+      console.log("Respuesta del servidor:", response);
+
+      // Si la operación fue exitosa, actualizar la UI
+      // Actualizamos el stock del producto localmente
+      setProducts(products.map(p => {
+        if (p.id === selectedProduct.id) {
+          // Incrementamos o decrementamos según el tipo de movimiento
+          const newStock = movementType === "entry"
+            ? p.stock + movementQuantity
+            : p.stock - movementQuantity;
+
+          return {
+            ...p,
+            stock: newStock
+          }
+        }
+        return p
+      }))
+
+      // Actualizamos los movimientos
+      fetchProducts()
+
+      // Mostramos una notificación de éxito
+      toast({
+        title: "Movimiento registrado",
+        description: `Se ha registrado un consumo de ${movementQuantity} unidades de ${selectedProduct.name}`,
+      })
+
+      // Cerramos el diálogo
+      setIsMovementDialogOpen(false)
+    } catch (error: any) {
+      console.error("Error al crear movimiento:", error);
+      // Verificamos si es un error de stock insuficiente
+      if (error.message && error.message.includes("No hay suficiente stock disponible")) {
+        toast({
+          title: "Stock insuficiente",
+          description: `No hay suficiente stock disponible para completar esta operación. Por favor verificar las cantidades.`,
+          variant: "destructive"
+        });
+      } else {
+        // Otros errores generales
+        toast({
+          title: "Error al registrar movimiento",
+          description: error.message || "No se pudo crear el movimiento de inventario",
+          variant: "destructive"
+        })
+      }
+    } finally {
+      setIsCreatingMovement(false)
+    }
   }
 
   // Determinar el color y el icono según el estado de stock
@@ -355,6 +489,10 @@ export default function UserInventoryPage() {
     if (typeof product.price === 'number' && product.price < 0) return "El precio no puede ser negativo";
     return null;
   };
+
+  // Estado para el título y descripción del diálogo de movimientos
+  const [dialogTitle, setDialogTitle] = useState("Registrar consumo de inventario")
+  const [dialogDescription, setDialogDescription] = useState("Complete los campos para registrar el consumo de productos.")
 
   return (
     <div className="container mx-auto py-6 space-y-8">
@@ -612,6 +750,16 @@ export default function UserInventoryPage() {
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openMovementDialog(product, "entry")}
+                                    title="Agregar stock"
+                                    className="text-green-600"
+                                  >
+                                    <PackagePlus size={16} />
+                                  </Button>
+
                                   {product.stock > 0 && (
                                     <Button
                                       variant="ghost"
@@ -646,9 +794,9 @@ export default function UserInventoryPage() {
         <TabsContent value="movements" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Historial de Consumos</CardTitle>
+              <CardTitle>Historial de Movimientos</CardTitle>
               <CardDescription>
-                Registro de salidas de inventario realizadas por usted
+                Registro de todas las entradas y salidas de inventario realizadas
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -659,24 +807,41 @@ export default function UserInventoryPage() {
                       <tr className="border-b bg-muted/50 font-medium">
                         <th className="py-3 px-4 text-left">Fecha</th>
                         <th className="py-3 px-4 text-left">Producto</th>
+                        <th className="py-3 px-4 text-left">Tipo</th>
                         <th className="py-3 px-4 text-left">Cantidad</th>
                         <th className="py-3 px-4 text-left hidden md:table-cell">Motivo</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedMovements.filter(m => m.user === user?.name && m.type === "exit").length === 0 ? (
+                      {sortedMovements.filter(m => m.user === user?.name).length === 0 ? (
                         <tr className="border-b">
-                          <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                          <td colSpan={5} className="py-8 text-center text-muted-foreground">
                             No tiene movimientos registrados.
                           </td>
                         </tr>
                       ) : (
                         sortedMovements
-                          .filter(m => m.user === user?.name && m.type === "exit")
+                          .filter(m => m.user === user?.name)
                           .map((movement, index) => (
                             <tr key={`movement-${movement.id || index}-${Date.now()}`} className="border-b transition-colors hover:bg-muted/50">
                               <td className="py-3 px-4 whitespace-nowrap">{formatDate(movement.date)}</td>
                               <td className="py-3 px-4 font-medium">{movement.productName}</td>
+                              <td className="py-3 px-4">
+                                <Badge
+                                  variant="outline"
+                                  className={`flex items-center gap-1 ${
+                                    movement.type === "entry"
+                                      ? "bg-green-100 text-green-800 border-green-200"
+                                      : "bg-amber-100 text-amber-800 border-amber-200"
+                                  }`}
+                                >
+                                  {movement.type === "entry" ? (
+                                    <><PackagePlus size={14} /> Entrada</>
+                                  ) : (
+                                    <><PackageMinus size={14} /> Salida</>
+                                  )}
+                                </Badge>
+                              </td>
                               <td className="py-3 px-4 font-semibold">{movement.quantity}</td>
                               <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{movement.reason}</td>
                             </tr>
@@ -693,72 +858,127 @@ export default function UserInventoryPage() {
 
       {/* Diálogo para registrar consumos */}
       <Dialog open={isMovementDialogOpen} onOpenChange={setIsMovementDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
-            <DialogTitle>Registrar Consumo de Inventario</DialogTitle>
+            <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>
-              {selectedProduct ? `Producto: ${selectedProduct.name}` : ""}
+              {dialogDescription}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {selectedProduct && (
-              <div className="flex flex-col gap-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Stock disponible:</span>
-                  <span className="font-medium">{selectedProduct.stock} unidades</span>
+
+          {/* Información del producto seleccionado */}
+          <div className="bg-muted/50 p-4 rounded-lg border mb-4 w-[85%] mx-auto shadow-sm">
+            <h3 className="text-lg font-semibold mb-1 text-center">{selectedProduct?.name || ""}</h3>
+            <div className="flex justify-center flex-wrap gap-3 text-muted-foreground text-sm mt-2">
+              <span className="flex items-center gap-1">
+                <Package size={14} />
+                {selectedProduct?.category || ""}
+              </span>
+              <span className="flex items-center gap-1">
+                <DollarSign size={14} />
+                ${selectedProduct?.price?.toFixed(2) || "0.00"}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-4 py-2">
+            {/* Información de stock disponible */}
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center bg-background p-2 rounded-md">
+                <h4 className="font-medium">Stock disponible:</h4>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="font-semibold bg-background">
+                    {selectedProduct?.stock || 0} unidades
+                  </Badge>
+                  {selectedProduct && selectedProduct.stock <= (selectedProduct?.minStock || 0) && (
+                    <span className="text-xs text-amber-600 flex items-center gap-1">
+                      <AlertTriangle size={14} />
+                      Stock bajo
+                    </span>
+                  )}
                 </div>
               </div>
-            )}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="quantity" className="text-right">
-                Cantidad
-              </Label>
-              <Input
-                id="quantity"
-                type="number"
-                value={movementQuantity}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0
-                  setMovementQuantity(value > 0 ? value : 1)
-                }}
-                className="col-span-3"
-                min="1"
-                step="1"
-              />
             </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="reason" className="text-right pt-2">
-                Motivo
-              </Label>
-              <Input
-                id="reason"
-                value={movementReason}
-                onChange={(e) => setMovementReason(e.target.value)}
-                className="col-span-3"
-                placeholder="Ej: Uso personal, proyecto, cliente..."
-              />
+
+            <div className="space-y-4 mt-2">
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Cantidad:</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  min={1}
+                  max={movementType === "exit" ? selectedProduct?.stock || 1 : 1000}
+                  value={movementQuantity}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    // Validación en tiempo real
+                    if (value <= 0) {
+                      setMovementQuantity(1);
+                    } else if (movementType === "exit" && selectedProduct && value > selectedProduct.stock) {
+                      // Limitar al máximo disponible solo para salidas
+                      setMovementQuantity(selectedProduct.stock);
+                      toast({
+                        title: "Cantidad ajustada",
+                        description: `La cantidad ha sido ajustada al máximo disponible (${selectedProduct.stock}).`,
+                        variant: "default"
+                      });
+                    } else {
+                      setMovementQuantity(value);
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reason">Motivo:</Label>
+                <Textarea
+                  id="reason"
+                  placeholder={movementType === "entry"
+                    ? "Ej: Compra de nuevas unidades, devolución de cliente..."
+                    : "Ej: Venta, pérdida, producto dañado..."
+                  }
+                  value={movementReason}
+                  onChange={(e) => setMovementReason(e.target.value)}
+                  className="resize-none"
+                  rows={3}
+                />
+              </div>
             </div>
-            {selectedProduct && selectedProduct.stock < movementQuantity && (
-              <div className="col-span-full text-destructive text-sm flex items-center gap-2">
+
+            {movementType === "exit" && selectedProduct && movementQuantity > selectedProduct.stock && (
+              <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm flex items-center gap-2">
                 <AlertTriangle size={16} />
                 No hay suficiente stock para esta operación.
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsMovementDialogOpen(false)}>
+          <DialogFooter className="pt-4">
+            <Button variant="outline" onClick={() => setIsMovementDialogOpen(false)}>
               Cancelar
             </Button>
             <Button
-              type="submit"
               onClick={handleStockMovement}
-              disabled={
+              className={`${movementType === "entry" ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}`}
+              disabled={!!(
+                isCreatingMovement ||
                 movementQuantity <= 0 ||
                 !movementReason ||
-                (selectedProduct ? selectedProduct.stock < movementQuantity : false)
-              }
+                (movementType === "exit" && selectedProduct && movementQuantity > selectedProduct.stock)
+              )}
             >
-              Registrar Consumo
+              {isCreatingMovement ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  {movementType === "entry"
+                    ? <><PackagePlus className="mr-2 h-4 w-4" /> Agregar stock</>
+                    : <><PackageMinus className="mr-2 h-4 w-4" /> Confirmar consumo</>
+                  }
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

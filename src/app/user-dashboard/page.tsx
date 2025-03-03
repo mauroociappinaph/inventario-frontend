@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Package, ShoppingCart, AlertTriangle, Clock, Settings, TrendingUp, TrendingDown, BarChart2, Home, CircleDollarSign } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { InventoryChart } from "@/components/inventory-chart"
+import { RoiPanel } from "@/components/roi-panel"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
 import { useInventory } from "@/hooks/useInventory"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
-import { InventoryChart } from "@/components/inventory-chart"
+import { AlertTriangle, BarChart2, CircleDollarSign, Clock, Package, ShoppingCart, TrendingDown, TrendingUp } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export default function UserDashboard() {
   const [isLoading, setIsLoading] = useState(true)
@@ -151,87 +151,193 @@ export default function UserDashboard() {
         </Card>
       </div>
 
+      {/* Segunda fila de tarjetas */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
+        {/* ROI Promedio */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">ROI Promedio</CardTitle>
+            <BarChart2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading || inventoryStatsLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {inventoryStats?.roi?.avgRoi ? `${inventoryStats.roi.avgRoi.toFixed(1)}%` : '0%'}
+                </div>
+                <p className="text-xs text-green-500 mt-1">
+                  Retorno sobre inversión
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Estadísticas de salud de inventario */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Salud del Inventario</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading || inventoryStatsLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {inventoryStats?.stockHealth || 'Normal'}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {inventoryStats?.lowStockCount || 0} productos con stock bajo
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Sección de Gráficos y Alertas */}
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 mb-6">
-        {isLoading ? (
-          <>
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-32" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-[300px] w-full" />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-32" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-[300px] w-full" />
-              </CardContent>
-            </Card>
-          </>
-        ) : (
-          <>
-            {/* Gráfico de Movimientos */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Movimiento de Inventario</CardTitle>
-                <CardDescription>Entradas y salidas de los últimos meses</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  <InventoryChart />
-                </div>
-              </CardContent>
-            </Card>
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 mb-6">
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle>Análisis de Inventario</CardTitle>
+            <CardDescription>
+              Movimientos y tendencias del último mes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <InventoryChart />
+          </CardContent>
+        </Card>
 
-            {/* Alertas de Inventario */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Alertas de Inventario</CardTitle>
-                <CardDescription>Productos que requieren atención</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/30 dark:border-yellow-800 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
-                      <div>
-                        <p className="font-medium">Producto A</p>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-400">Stock bajo: 3 unidades</p>
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle>Indicadores de Rendimiento</CardTitle>
+            <CardDescription>
+              Estadísticas y métricas importantes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="alertas">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="alertas">Alertas</TabsTrigger>
+                <TabsTrigger value="predicciones">Predicciones</TabsTrigger>
+                <TabsTrigger value="roi">ROI</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="alertas" className="space-y-4">
+                {/* Contenido de la pestaña de alertas */}
+                {isLoading || inventoryStatsLoading ? (
+                  Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4">
+                      <Skeleton className="h-12 w-12 rounded-full" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-4 w-24" />
                       </div>
                     </div>
-                    <Button size="sm" variant="outline">Ver</Button>
+                  ))
+                ) : (
+                  <div className="space-y-4">
+                    {inventoryStats?.lowStockCount ? (
+                      <div className="flex items-center p-3 bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-200 rounded-md">
+                        <AlertTriangle className="h-5 w-5 mr-3 text-amber-500" />
+                        <div>
+                          <p className="font-medium">Stock bajo en {inventoryStats.lowStockCount} productos</p>
+                          <p className="text-xs mt-1">Revisa el inventario para realizar pedidos</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center p-3 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200 rounded-md">
+                        <Package className="h-5 w-5 mr-3 text-green-500" />
+                        <div>
+                          <p className="font-medium">Niveles de stock adecuados</p>
+                          <p className="text-xs mt-1">Todos los productos tienen stock suficiente</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                )}
+              </TabsContent>
 
-                  <div className="flex items-center justify-between p-4 border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/30 dark:border-yellow-800 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500" />
-                      <div>
-                        <p className="font-medium">Producto B</p>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-400">Stock bajo: 2 unidades</p>
+              <TabsContent value="predicciones" className="space-y-4">
+                {/* Contenido de la pestaña de predicciones */}
+                {isLoading || inventoryStatsLoading || !inventoryStats?.predictions ? (
+                  Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  ))
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Productos que necesitarán reposición pronto:</h4>
+                      <div className="space-y-3">
+                        {inventoryStats.predictions.upcomingReorders.map((product, index) => (
+                          <div key={index} className="flex justify-between items-center border-b pb-2">
+                            <div>
+                              <p className="font-medium">{product.productName}</p>
+                              <p className="text-xs text-muted-foreground">Stock actual: {product.currentStock}</p>
+                            </div>
+                            <Badge variant="outline" className="bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200 hover:bg-amber-100">
+                              {product.daysUntilReorder} días
+                            </Badge>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <Button size="sm" variant="outline">Ver</Button>
                   </div>
+                )}
+              </TabsContent>
 
-                  <div className="flex items-center justify-between p-4 border border-red-200 bg-red-50 dark:bg-red-900/30 dark:border-red-800 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-500" />
-                      <div>
-                        <p className="font-medium">Producto C</p>
-                        <p className="text-sm text-red-700 dark:text-red-400">Sin stock</p>
+              <TabsContent value="roi" className="space-y-4">
+                {/* Contenido de la pestaña de ROI */}
+                {isLoading || inventoryStatsLoading || !inventoryStats?.roi ? (
+                  Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  ))
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Productos con mejor ROI:</h4>
+                      <div className="space-y-3">
+                        {(inventoryStats.roi.topRoiProducts || []).map((product, index) => (
+                          <div key={index} className="flex justify-between items-center border-b pb-2">
+                            <div>
+                              <p className="font-medium">{product.productName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Ventas: {product.totalSalidas} unidades
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200 hover:bg-green-100">
+                              ROI: {product.roi.toFixed(1)}%
+                            </Badge>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <Button size="sm" variant="outline">Ver</Button>
+                    <div className="pt-2">
+                      <p className="text-xs text-muted-foreground">
+                        El ROI (Retorno sobre Inversión) muestra la rentabilidad de cada producto en relación a su costo.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Panel de ROI detallado */}
+      <div className="mb-6">
+        <RoiPanel />
       </div>
 
       {/* Pestañas para diferentes vistas */}

@@ -21,6 +21,22 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
+
+    // Para solicitudes POST que van a /inventory, verificamos que el productId exista
+    if (config.method === 'post' && config.url === '/inventory' && config.data) {
+      console.log('Interceptor - Datos enviados a /inventory:',
+        typeof config.data === 'string' ? JSON.parse(config.data) : config.data
+      );
+
+      const data = typeof config.data === 'string'
+        ? JSON.parse(config.data)
+        : config.data;
+
+      if (!data.productId) {
+        console.error('Interceptor - Error: falta productId en la solicitud a /inventory');
+      }
+    }
+
     return config;
   },
   (error) => {
@@ -245,7 +261,43 @@ export const inventoryService = {
     return api.get('/inventory');
   },
   createInventoryMovement: async (movementData: any) => {
-    return api.post('/inventory', movementData);
+    // Verificamos que productId esté presente y tenga el formato esperado
+    if (!movementData.productId) {
+      console.error('Error: productId es requerido para crear un movimiento de inventario');
+      throw new Error('productId es requerido');
+    }
+
+    // Aseguramos que productId sea una cadena
+    const productId = String(movementData.productId);
+
+    // Verificamos que tenga el formato de ID de MongoDB
+    if (!/^[0-9a-fA-F]{24}$/.test(productId)) {
+      console.error(`Error: productId '${productId}' no tiene formato válido de MongoDB (24 caracteres hexadecimales)`);
+      throw new Error('productId no tiene formato válido');
+    }
+
+    // Mapeamos el movementType al formato correcto para el backend
+    let movementType = movementData.movementType;
+    if (movementType === 'entrada' || movementType === 'in') movementType = 'in';
+    if (movementType === 'salida' || movementType === 'out') movementType = 'out';
+
+    // Para compatibilidad interna (el backend podría usar 'type' en algún lugar)
+    let type = 'in';
+    if (movementData.type === 'exit' || movementData.type === 'salida' || movementType === 'out') {
+      type = 'out';
+    }
+
+    // Creamos una copia del objeto con el ID correcto y tipos compatibles
+    const dataToSend = {
+      ...movementData,
+      productId: productId,
+      movementType: movementType, // Usamos 'in' o 'out' para la validación del DTO
+      type: type, // Mantenemos 'type' por compatibilidad
+      date: movementData.date || movementData.movementDate // Aseguramos que la fecha exista
+    };
+
+    console.log('📦 Enviando datos de movimiento al backend:', dataToSend);
+    return api.post('/inventory', dataToSend);
   },
   getInventoryMovementById: async (id: string) => {
     return api.get(`/inventory/${id}`);

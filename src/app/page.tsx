@@ -5,11 +5,42 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/context/auth-context";
-import { ArrowRight, BarChart2, BarChart3, Clock, Package, PackageCheck, ShieldCheck, TrendingUp, User } from "lucide-react";
+import { InventoryStats, dashboardService } from '@/lib/api/dashboard-service';
+import { ArrowRight, BarChart2, BarChart3, Clock, Package, PackageCheck, TrendingUp, User } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const [inventoryStats, setInventoryStats] = useState<InventoryStats | null>(null);
+
+  // Obtener estadísticas básicas al cargar la página
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Si estamos autenticados, obtener datos reales
+        if (isAuthenticated) {
+          const stats = await dashboardService.getInventoryStats();
+          setInventoryStats(stats);
+        } else {
+          // Si no, usar datos simulados
+          const simulatedStats = dashboardService.getSimulatedInventoryStats();
+          setInventoryStats(simulatedStats);
+        }
+      } catch (error) {
+        console.error('Error al obtener estadísticas:', error);
+      }
+    };
+
+    fetchData();
+  }, [isAuthenticated]);
+
+  // Para la landing page, siempre mostrar 250% como ROI (valor fijo, solo informativo)
+  // Para usuarios autenticados, el valor real se mostrará en su dashboard
+  const roiValue = 250; // Valor fijo para la landing page
+
   const isAdmin = user?.roles?.includes('admin');
 
   const dashboardPath = isAuthenticated
@@ -97,7 +128,7 @@ export default function Home() {
               <CardTitle className="text-sm font-medium">ROI Promedio</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">250%</div>
+              <div className="text-2xl font-bold">{roiValue}%</div>
               <div className="flex items-center mt-1 text-xs text-green-600">
                 <BarChart2 className="h-3 w-3 mr-1" />
                 <span>En el primer año</span>
@@ -128,14 +159,6 @@ export default function Home() {
                 <li className="flex items-center">
                   <div className="w-1.5 h-1.5 rounded-full bg-sky-500 mr-2"></div>
                   Organización por categorías
-                </li>
-                <li className="flex items-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500 mr-2"></div>
-                  Asignación de SKUs
-                </li>
-                <li className="flex items-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500 mr-2"></div>
-                  Imágenes y descripciones
                 </li>
               </ul>
             </CardContent>
@@ -169,84 +192,13 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <Card className="flex flex-col">
-            <CardHeader>
-              <div className="bg-sky-100 p-3 rounded-full w-fit dark:bg-sky-900">
-                <ShieldCheck className="h-6 w-6 text-sky-600 dark:text-sky-400" />
-              </div>
-              <CardTitle className="mt-4">Seguridad y Acceso</CardTitle>
-              <CardDescription>
-                Define permisos y roles para cada usuario de tu sistema.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow">
-              <ul className="space-y-2 text-sm">
-                <li className="flex items-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500 mr-2"></div>
-                  Múltiples niveles de acceso
-                </li>
-                <li className="flex items-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500 mr-2"></div>
-                  Registro de actividad
-                </li>
-                <li className="flex items-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500 mr-2"></div>
-                  Autenticación segura
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
-      {/* Accesos rápidos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mb-12">
-        {/* Tarjeta de Dashboard */}
-        <Link href={dashboardPath} className="block">
-          <div className="group h-full flex flex-col items-center p-6 bg-white rounded-xl border border-sky-200 shadow-sm transition-all hover:shadow-md hover:border-sky-300 dark:bg-sky-900/50 dark:border-sky-700 dark:hover:border-sky-600">
-            <div className="bg-sky-100 p-4 rounded-full mb-4 group-hover:bg-sky-200 dark:bg-sky-800 dark:group-hover:bg-sky-700">
-              <BarChart3 className="h-8 w-8 text-sky-600 dark:text-sky-300" />
-            </div>
-            <h2 className="text-xl font-semibold mb-2 text-sky-700 dark:text-sky-300">Dashboard</h2>
-            <p className="text-center text-sky-600 dark:text-sky-400">
-              Visualiza estadísticas y métricas importantes
-            </p>
-          </div>
-        </Link>
 
-        {/* Tarjeta de Inventario */}
-        <Link href={inventoryPath} className="block">
-          <div className="group h-full flex flex-col items-center p-6 bg-white rounded-xl border border-sky-200 shadow-sm transition-all hover:shadow-md hover:border-sky-300 dark:bg-sky-900/50 dark:border-sky-700 dark:hover:border-sky-600">
-            <div className="bg-sky-100 p-4 rounded-full mb-4 group-hover:bg-sky-200 dark:bg-sky-800 dark:group-hover:bg-sky-700">
-              <Package className="h-8 w-8 text-sky-600 dark:text-sky-300" />
-            </div>
-            <h2 className="text-xl font-semibold mb-2 text-sky-700 dark:text-sky-300">Gestión de Inventario</h2>
-            <p className="text-center text-sky-600 dark:text-sky-400">
-              Controla stock, entradas y salidas de productos
-            </p>
-          </div>
-        </Link>
 
-        {/* Tarjeta de Login o Perfil */}
-        <Link href={isAuthenticated ? "/profile" : "/login"} className="block">
-          <div className="group h-full flex flex-col items-center p-6 bg-white rounded-xl border border-sky-200 shadow-sm transition-all hover:shadow-md hover:border-sky-300 dark:bg-sky-900/50 dark:border-sky-700 dark:hover:border-sky-600">
-            <div className="bg-sky-100 p-4 rounded-full mb-4 group-hover:bg-sky-200 dark:bg-sky-800 dark:group-hover:bg-sky-700">
-              <User className="h-8 w-8 text-sky-600 dark:text-sky-300" />
-            </div>
-            <h2 className="text-xl font-semibold mb-2 text-sky-700 dark:text-sky-300">
-              {isAuthenticated ? "Mi Perfil" : "Iniciar Sesión"}
-            </h2>
-            <p className="text-center text-sky-600 dark:text-sky-400">
-              {isAuthenticated ? "Accede a la configuración de tu cuenta" : "Accede a tu cuenta para gestionar tu inventario"}
-            </p>
-          </div>
-        </Link>
-      </div>
 
-      {/* Footer */}
-      <div className="w-full text-center border-t pt-8 text-muted-foreground">
-        <p>© 2023 Sistema de Gestión de Inventario. Todos los derechos reservados.</p>
-      </div>
+
     </PageTransition>
   );
 }

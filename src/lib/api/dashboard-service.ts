@@ -1,5 +1,5 @@
-import axios from 'axios';
 import { API_URL } from '@/config/api';
+import axios from 'axios';
 import authService from './auth-service';
 
 const API = axios.create({
@@ -88,6 +88,17 @@ export interface InventoryStats {
     totalStock: number;
     totalValue: number;
   }[];
+  roi?: {
+    avgRoi: number;
+    topRoiProducts?: {
+      _id: string;
+      productName: string;
+      totalSalidas: number;
+      totalValorSalidas: number;
+      costoPromedio: number;
+      roi: number;
+    }[];
+  };
 }
 
 export interface DashboardStats {
@@ -173,15 +184,54 @@ class DashboardService {
         throw new Error('No se encontró token de autenticación');
       }
 
+      console.log('🔍 [DashboardService] Solicitando estadísticas generales de inventario...');
       const response = await API.get('/inventory/statistics', {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('📊 [DashboardService] Respuesta de estadísticas generales recibida:', response.data);
+
+      // Intentar obtener los datos de ROI de manera específica
+      let roiData = undefined;
+      try {
+        console.log('🔍 [DashboardService] Solicitando datos específicos de ROI...');
+        const roiResponse = await API.get('/inventory/statistics/roi', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        console.log('📊 [DashboardService] Respuesta de ROI completa:', JSON.stringify(roiResponse.data, null, 2));
+
+        if (roiResponse.data && roiResponse.data.roi) {
+          roiData = roiResponse.data.roi;
+          console.log('✅ [DashboardService] Datos de ROI obtenidos exitosamente:', JSON.stringify(roiData, null, 2));
+          console.log('   [DashboardService] ROI promedio:', roiData.avgRoi);
+        } else if (roiResponse.data && typeof roiResponse.data === 'object') {
+          console.log('⚠️ [DashboardService] Estructura de ROI no estándar, buscando otras opciones...');
+
+          // Búsqueda en primer nivel
+          if ('avgRoi' in roiResponse.data) {
+            console.log('✅ [DashboardService] avgRoi encontrado directamente en la respuesta:', roiResponse.data.avgRoi);
+            roiData = roiResponse.data;
+          } else {
+            // Búsqueda más profunda
+            for (const key in roiResponse.data) {
+              const value = roiResponse.data[key];
+              if (value && typeof value === 'object' && 'avgRoi' in value) {
+                console.log(`✅ [DashboardService] avgRoi encontrado en atributo ${key}:`, value.avgRoi);
+                roiData = value;
+                break;
+              }
+            }
+          }
+        }
+      } catch (roiError) {
+        console.warn('⚠️ [DashboardService] Error al obtener datos específicos de ROI:', roiError);
+      }
 
       // Verificar si la respuesta tiene la estructura esperada
       const responseData = response.data;
 
       if (!responseData || !responseData.movement || typeof responseData.movement.entriesCount === 'undefined') {
-        console.warn('La respuesta de inventario no tiene el formato esperado, transformando datos...');
+        console.warn('⚠️ [DashboardService] La respuesta de inventario no tiene el formato esperado, transformando datos...');
 
         // Extraer los datos disponibles o usar valores por defecto
         const extractedData: InventoryStats = {
@@ -198,15 +248,26 @@ class DashboardService {
             transfersCount: responseData?.movement?.transfersCount || responseData?.transfersCount || 0
           },
           topMovedProducts: responseData?.topMovedProducts || [],
-          stockByCategory: responseData?.stockByCategory || []
+          stockByCategory: responseData?.stockByCategory || [],
+          // Usar los datos específicos de ROI si están disponibles
+          roi: roiData || responseData?.roi
         };
 
+        console.log('📊 [DashboardService] Datos extractados a devolver:', JSON.stringify(extractedData.roi, null, 2));
         return extractedData;
+      }
+
+      // Si los datos de ROI están disponibles, reemplazar los que vienen en la respuesta general
+      if (roiData) {
+        console.log('📊 [DashboardService] Actualizando datos de ROI en respuesta general:', JSON.stringify(roiData, null, 2));
+        responseData.roi = roiData;
+      } else {
+        console.log('📊 [DashboardService] Usando datos de ROI de respuesta general:', responseData.roi);
       }
 
       return responseData;
     } catch (error) {
-      console.error('Error al obtener estadísticas de inventario:', error);
+      console.error('❌ [DashboardService] Error al obtener estadísticas de inventario:', error);
       this.handleApiError(error);
       throw error;
     }
@@ -412,7 +473,52 @@ class DashboardService {
           totalStock: 660,
           totalValue: 36300
         }
-      ]
+      ],
+      roi: {
+        avgRoi: 0, // Cambiado de 85 a 0 para evitar mostrar datos simulados incorrectos
+        topRoiProducts: [
+          {
+            _id: 'sim-roi-1',
+            productName: 'Smartphone X Pro',
+            totalSalidas: 25,
+            totalValorSalidas: 25000,
+            costoPromedio: 800,
+            roi: 0 // Cambiado para no mostrar valores simulados altos
+          },
+          {
+            _id: 'sim-roi-2',
+            productName: 'Tablet Ultra',
+            totalSalidas: 18,
+            totalValorSalidas: 16200,
+            costoPromedio: 600,
+            roi: 0
+          },
+          {
+            _id: 'sim-roi-3',
+            productName: 'Audífonos Deluxe',
+            totalSalidas: 40,
+            totalValorSalidas: 8000,
+            costoPromedio: 120,
+            roi: 0
+          },
+          {
+            _id: 'sim-roi-4',
+            productName: 'Smart Watch',
+            totalSalidas: 15,
+            totalValorSalidas: 4500,
+            costoPromedio: 200,
+            roi: 0
+          },
+          {
+            _id: 'sim-roi-5',
+            productName: 'Cámara 4K',
+            totalSalidas: 10,
+            totalValorSalidas: 6500,
+            costoPromedio: 400,
+            roi: 0
+          }
+        ]
+      }
     };
   }
 }

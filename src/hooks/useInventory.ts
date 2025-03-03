@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
 import { useInventoryStore } from '@/stores/inventoryStore';
 import { Product } from '@/stores/inventoryTypes';
 import axios, { AxiosError } from 'axios';
+import { useEffect, useMemo, useState } from 'react';
 
 // Interfaces para tipado de estadísticas
 interface ProductStatistics {
@@ -43,7 +43,24 @@ interface InventoryStatistics {
   stockHealth: string;
   trends?: InventoryTrends;
   predictions?: InventoryPredictions;
+  roi?: {
+    avgRoi: number;
+    topRoiProducts?: any[];
+  };
   isFromApi: boolean;
+}
+
+interface InventoryApiStats {
+  [key: string]: any;
+  trends?: {
+    [key: string]: any;
+  };
+  movements?: {
+    [key: string]: any;
+  };
+  general?: {
+    [key: string]: any;
+  };
 }
 
 /**
@@ -70,10 +87,6 @@ export function useInventory() {
     setSelectedProductId
   } = useInventoryStore();
   // Estado para almacenar estadísticas del servidor
-  interface InventoryApiStats {
-    [key: string]: unknown; // Cambiar 'any' por 'unknown' para mayor seguridad de tipo
-  }
-
   const [inventoryApiStats, setInventoryApiStats] = useState<InventoryApiStats | null>(null);
   const [inventoryStatsLoading, setInventoryStatsLoading] = useState<boolean>(false);
   const [inventoryStatsError, setInventoryStatsError] = useState<string | null>(null);
@@ -110,29 +123,89 @@ export function useInventory() {
         const token = localStorage.getItem('auth_token');
 
         if (!token) {
-          console.warn('No se encontró token de autenticación para obtener estadísticas');
+          console.warn('🔑 [useInventory] No se encontró token de autenticación para obtener estadísticas');
           setInventoryStatsLoading(false);
           return;
         }
 
+        console.log('🔍 [useInventory] Solicitando estadísticas generales de inventario...');
         const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/inventory/statistics`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
         });
 
+        console.log('📊 [useInventory] Respuesta de estadísticas generales recibida:', response.data);
+
+        // Obtener también los datos específicos del ROI
+        console.log('🔍 [useInventory] Solicitando estadísticas específicas de ROI...');
+        const roiResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/inventory/statistics/roi`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        console.log('📊 [useInventory] Datos de ROI recibidos (estructura completa):', JSON.stringify(roiResponse.data, null, 2));
+
+        let inventoryData = null;
         if (response.data && response.data.data) {
-          setInventoryApiStats(response.data.data);
+          inventoryData = response.data.data;
+        } else if (response.data) {
+          inventoryData = response.data;
         } else {
           throw new Error('Formato de respuesta inesperado');
         }
+
+        // Incorporar los datos de ROI
+        if (roiResponse.data && roiResponse.data.roi) {
+          console.log('✅ [useInventory] Estructura de ROI estándar encontrada:', roiResponse.data.roi);
+          console.log('   [useInventory] ROI promedio recibido:', roiResponse.data.roi.avgRoi);
+          inventoryData.roi = roiResponse.data.roi;
+        } else if (roiResponse.data) {
+          console.log('⚠️ [useInventory] Estructura de ROI no estándar:', roiResponse.data);
+          // Intentar extraer directamente
+          if ('avgRoi' in roiResponse.data) {
+            console.log('✅ [useInventory] avgRoi encontrado directamente:', roiResponse.data.avgRoi);
+            inventoryData.roi = roiResponse.data;
+          } else {
+            // Buscar más profundo
+            const deepSearch = (obj: any): any => {
+              if (!obj || typeof obj !== 'object') return null;
+
+              for (const key in obj) {
+                if (key === 'avgRoi') {
+                  console.log(`✅ [useInventory] avgRoi encontrado en la respuesta: ${obj[key]}`);
+                  return { avgRoi: obj[key], topRoiProducts: obj.topRoiProducts || [] };
+                }
+
+                if (typeof obj[key] === 'object') {
+                  const result = deepSearch(obj[key]);
+                  if (result) return result;
+                }
+              }
+
+              return null;
+            };
+
+            const roiData = deepSearch(roiResponse.data);
+            if (roiData) {
+              console.log('✅ [useInventory] Datos de ROI encontrados mediante búsqueda profunda:', roiData);
+              inventoryData.roi = roiData;
+            } else {
+              console.warn('⚠️ [useInventory] No se encontraron datos de ROI en la respuesta');
+            }
+          }
+        }
+
+        console.log('📊 [useInventory] Datos finales de inventario con ROI:', JSON.stringify(inventoryData.roi, null, 2));
+        setInventoryApiStats(inventoryData);
       } catch (err) {
-        console.error('Error al obtener estadísticas de inventario:', err);
+        console.error('❌ [useInventory] Error al obtener estadísticas de inventario:', err);
 
         // Manejo de errores mejorado con detalles específicos
         if (axios.isAxiosError(err)) {
           const axiosError = err as AxiosError;
-          console.log("Detalles completos del error:", {
+          console.log("❌ [useInventory] Detalles completos del error:", {
             status: axiosError.response?.status,
             data: axiosError.response?.data,
             headers: axiosError.response?.headers,
@@ -269,8 +342,18 @@ export function useInventory() {
   const inventoryStats = useMemo((): InventoryStatistics => {
     // Si tenemos estadísticas de la API, usar esos datos
     if (inventoryApiStats) {
+      console.log('📊 [useInventory] Usando estadísticas de API para calcular ROI');
+
+      // Verificar si tenemos datos de ROI
+      if (inventoryApiStats.roi) {
+        console.log('✅ [useInventory] Encontrados datos de ROI en inventoryApiStats:', inventoryApiStats.roi);
+        console.log('   [useInventory] avgRoi =', inventoryApiStats.roi.avgRoi);
+      } else {
+        console.warn('⚠️ [useInventory] No se encontraron datos de ROI en inventoryApiStats');
+      }
+
       // Procesar tendencias con datos mejorados
-      const apiTrends = inventoryApiStats.trends || {};
+      const apiTrends = inventoryApiStats.trends || {} as Record<string, any>;
       const movementsTrend: MovementTrend = {
         current: apiTrends.currentPeriodMovements || inventoryApiStats.movements?.total || 0,
         previous: apiTrends.previousPeriodMovements || 0,
@@ -385,6 +468,19 @@ export function useInventory() {
       }
     };
 
+    // Simulación de ROI para datos locales
+    const simulatedRoi = {
+      avgRoi: 0, // Cambiado de 250 a 0 para que no muestre un valor incorrecto cuando no hay datos reales
+      topRoiProducts: products.slice(0, 5).map(p => ({
+        _id: p.id,
+        productName: p.name,
+        totalSalidas: Math.floor(Math.random() * 30 + 10),
+        totalValorSalidas: p.price * (Math.floor(Math.random() * 30 + 10)),
+        costoPromedio: p.price * 0.6,
+        roi: 0 // Cambiado para no mostrar valores simulados altos
+      }))
+    };
+
     return {
       totalProducts,
       totalStock,
@@ -392,6 +488,7 @@ export function useInventory() {
       averagePrice,
       trends,
       predictions,
+      roi: simulatedRoi,
       stockHealth: determineStockHealth(lowStockCount, totalProducts),
       isFromApi: false
     };
