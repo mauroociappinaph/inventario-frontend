@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,7 +22,9 @@ import {
   PackagePlus,
   SearchIcon
 } from "lucide-react"
-import { useState } from "react"
+
+// Importamos el servicio de productos y el tipo para crear productos
+import { productService, CreateProductDto } from "@/lib/api/api"
 
 // Tipos para los productos y movimientos
 interface Product {
@@ -32,9 +35,9 @@ interface Product {
   stock: number
   minStock: number
   lastUpdated: string
-  entryDate?: Date   // Fecha de entrada
-  exitDate?: Date   // Fecha de salida
-  lastStockUpdate: Date
+  entryDate?: string
+  exitDate?: string
+  lastStockUpdate: string
 }
 
 interface StockMovement {
@@ -69,7 +72,7 @@ export default function UserInventoryPage() {
   const [sortBy, setSortBy] = useState("name")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
 
-  // Nuevo estado para el diálogo de agregar productos
+  // Estado para el diálogo de agregar productos
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false)
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -77,7 +80,7 @@ export default function UserInventoryPage() {
     minimumStock: 0,
     stock: 0,
     location: "",
-    entryDate: "",
+    entryDate: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD para input date
     exitDate: "",
     price: 0
   })
@@ -89,7 +92,7 @@ export default function UserInventoryPage() {
   const totalProducts = products.length
   const lowStockProducts = products.filter(p => p.stock <= p.minStock).length
   const totalStock = products.reduce((sum, p) => sum + p.stock, 0)
-  const criticalStockPercentage = (lowStockProducts / totalProducts) * 100
+  const criticalStockPercentage = totalProducts > 0 ? (lowStockProducts / totalProducts) * 100 : 0
 
   // Función para manejar el ordenamiento
   const handleSort = (field: string) => {
@@ -105,12 +108,10 @@ export default function UserInventoryPage() {
   const filteredProducts = products
     .filter(product  => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
-
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter
       const matchesStock = stockFilter === "all" ||
-                          (stockFilter === "low" && product.stock <= product.minStock) ||
-                          (stockFilter === "normal" && product.stock > product.minStock)
-
+                            (stockFilter === "low" && product.stock <= product.minStock) ||
+                            (stockFilter === "normal" && product.stock > product.minStock)
       return matchesSearch && matchesCategory && matchesStock
     })
     .sort((a, b) => {
@@ -130,8 +131,41 @@ export default function UserInventoryPage() {
     return new Date(b.date).getTime() - new Date(a.date).getTime()
   })
 
-  // Función para abrir el diálogo de movimientos
-  // Los usuarios solo pueden registrar salidas (consumos)
+  // Función para obtener productos desde la API
+  const fetchProducts = async () => {
+    try {
+      if (!user?.id) {
+        toast({
+          title: "Error de autenticación",
+          description: "Por favor inicie sesión para ver sus productos.",
+          variant: "destructive"
+        })
+        return
+      }
+      // Se utiliza una paginación amplia para obtener todos los productos del usuario
+      const response = await productService.getProducts(1, 100, user.id)
+      if (response.data && Array.isArray(response.data.products)) {
+        setProducts(response.data.products)
+      } else {
+        setProducts([])
+      }
+    } catch (error) {
+      console.error("Error al obtener productos:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo cargar los productos.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchProducts()
+    }
+  }, [user])
+
+  // Función para abrir el diálogo de movimientos (solo salidas para usuarios normales)
   const openMovementDialog = (product: Product, type: "exit") => {
     setSelectedProduct(product)
     setMovementType(type)
@@ -144,7 +178,6 @@ export default function UserInventoryPage() {
   const handleStockMovement = () => {
     if (!selectedProduct) return
 
-    // Para salidas, verificar que haya suficiente stock
     if (selectedProduct.stock < movementQuantity) {
       toast({
         title: "Error de stock",
@@ -154,7 +187,6 @@ export default function UserInventoryPage() {
       return
     }
 
-    // Crear nuevo movimiento
     const newMovement: StockMovement = {
       id: (Math.max(...stockMovements.map(m => parseInt(m.id))) + 1).toString(),
       productId: selectedProduct.id,
@@ -166,7 +198,7 @@ export default function UserInventoryPage() {
       user: user?.name || "Usuario"
     }
 
-    // Actualizar stock del producto (solo salidas para usuarios normales)
+    // Actualizamos el stock del producto
     setProducts(products.map(p => {
       if (p.id === selectedProduct.id) {
         return {
@@ -178,12 +210,9 @@ export default function UserInventoryPage() {
       return p
     }))
 
-    // Añadir el movimiento al historial
+    // Agregamos el movimiento al historial
     setStockMovements([...stockMovements, newMovement])
-
-    // Cerrar el diálogo y mostrar mensaje
     setIsMovementDialogOpen(false)
-
     toast({
       title: "Salida registrada",
       description: `Se ha registrado una salida de ${movementQuantity} unidades de ${selectedProduct.name}.`
@@ -216,67 +245,96 @@ export default function UserInventoryPage() {
     }
   }
 
-  // Formatear fecha a formato legible
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date)
+  // Formatear fecha a un formato legible
+  const formatDate = (dateString: string | undefined) => {
+    try {
+      if (!dateString) return 'Fecha no disponible';
+
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Fecha inválida';
+
+      return new Intl.DateTimeFormat('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch (error) {
+      console.error('Error al formatear fecha:', error, 'dateString:', dateString);
+      return 'Fecha no disponible';
+    }
   }
 
-  // Función para agregar un nuevo producto
-  const handleAddProduct = () => {
-    // Crear un ID para el nuevo producto
-    const newId = (Math.max(...products.map(p => parseInt(p.id) || 0)) + 1).toString()
+  // Función para agregar un nuevo producto mediante la API
+  const handleAddProduct = async () => {
+    try {
+      if (!user?.id) {
+        toast({
+          title: "Error de autenticación",
+          description: "Por favor inicie sesión para agregar productos.",
+          variant: "destructive"
+        })
+        return
+      }
+      if (!newProduct.name || !newProduct.category) {
+        toast({
+          title: "Campos incompletos",
+          description: "Complete todos los campos requeridos.",
+          variant: "destructive"
+        })
+        return
+      }
 
-    // Crear el nuevo producto
-    const productToAdd: Product = {
-      id: newId,
-      name: newProduct.name,
-      category: newProduct.category,
-      price: newProduct.price,
-      stock: newProduct.stock,
-      minStock: newProduct.minimumStock,
-      lastStockUpdate: new Date(),
-      entryDate: new Date(newProduct.entryDate),
-      exitDate: new Date(newProduct.exitDate),
-      lastUpdated: new Date().toISOString()
+      const productToAdd: Partial<CreateProductDto> = {
+        name: newProduct.name.trim(),
+        category: newProduct.category.trim(),
+        price: newProduct.price,
+        stock: newProduct.stock,
+        minStock: newProduct.minimumStock,
+        entryDate: newProduct.entryDate ? new Date(newProduct.entryDate).toISOString() : new Date().toISOString(),
+        userId: user.id
+      }
+
+      console.log("Enviando datos de producto:", productToAdd)
+
+      const response = await productService.createProduct(productToAdd)
+      console.log("Respuesta del servidor:", response)
+
+      // Actualizamos la lista de productos llamando a fetchProducts
+      await fetchProducts()
+
+      // Reiniciamos el formulario y cerramos el diálogo
+      setNewProduct({
+        name: "",
+        category: "",
+        minimumStock: 0,
+        stock: 0,
+        location: "",
+        entryDate: new Date().toISOString().split('T')[0],
+        exitDate: "",
+        price: 0
+      })
+      setIsAddProductDialogOpen(false)
+
+      toast({
+        title: "Producto añadido",
+        description: `Se ha añadido "${productToAdd.name}" al inventario.`
+      })
+    } catch (error) {
+      console.error("Error al crear producto:", error)
+      toast({
+        title: "Error al crear producto",
+        description: "No se pudo agregar el producto. Intente nuevamente.",
+        variant: "destructive"
+      })
     }
-
-    // Añadir el producto a la lista
-    setProducts([...products, productToAdd])
-
-    // Reiniciar el formulario
-    setNewProduct({
-      name: "",
-      category: "",
-      minimumStock: 0,
-      stock: 0,
-      location: "",
-      entryDate: "",
-      exitDate: "",
-      price: 0
-    })
-
-    // Cerrar el diálogo
-    setIsAddProductDialogOpen(false)
-
-    // Mostrar notificación
-    toast({
-      title: "Producto añadido",
-      description: `Se ha añadido "${productToAdd.name}" al inventario.`
-    })
   }
 
   return (
     <div className="container mx-auto py-6 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <h1 className="text-3xl font-bold">Consulta de Inventario</h1>
-        {/* Usuarios normales solo pueden ver informes, no exportar datos */}
         <div className="flex flex-wrap gap-2">
           <Button
             variant="default"
@@ -291,8 +349,6 @@ export default function UserInventoryPage() {
             <FileBarChart size={16} />
             Solicitar Informe
           </Button>
-
-          {/* Nuevo botón para agregar productos */}
           <Button
             variant="outline"
             className="gap-2"
@@ -380,7 +436,7 @@ export default function UserInventoryPage() {
           </TabsTrigger>
           <TabsTrigger value="movements" className="flex items-center gap-2">
             <History size={16} />
-            <span>Mis Consumos</span>
+            <span>Mis Movimientos</span>
           </TabsTrigger>
         </TabsList>
 
@@ -401,7 +457,6 @@ export default function UserInventoryPage() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
-
                   <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                     <SelectTrigger className="w-full md:w-[150px]">
                       <SelectValue placeholder="Categoría" />
@@ -409,13 +464,12 @@ export default function UserInventoryPage() {
                     <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
                       {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
+                        <SelectItem key={`category-${category}`} value={category}>
                           {category}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-
                   <Select value={stockFilter} onValueChange={setStockFilter}>
                     <SelectTrigger className="w-full md:w-[150px]">
                       <SelectValue placeholder="Estado de Stock" />
@@ -467,11 +521,29 @@ export default function UserInventoryPage() {
                             className="flex items-center gap-1"
                             onClick={() => handleSort("stock")}
                           >
-                            Stock
+                            Stock Actual
+                            <ArrowUpDown size={14} className="text-muted-foreground" />
+                          </button>
+                        </th>
+                        <th className="py-3 px-4 text-left hidden lg:table-cell">
+                          <button
+                            className="flex items-center gap-1"
+                            onClick={() => handleSort("minStock")}
+                          >
+                            Stock Mínimo
                             <ArrowUpDown size={14} className="text-muted-foreground" />
                           </button>
                         </th>
                         <th className="py-3 px-4 text-left hidden lg:table-cell">Estado</th>
+                        <th className="py-3 px-4 text-left hidden lg:table-cell">
+                          <button
+                            className="flex items-center gap-1"
+                            onClick={() => handleSort("entryDate")}
+                          >
+                            Fecha Entrada
+                            <ArrowUpDown size={14} className="text-muted-foreground" />
+                          </button>
+                        </th>
                         <th className="py-3 px-4 text-left hidden lg:table-cell">Última Actualización</th>
                         <th className="py-3 px-4 text-right">Acciones</th>
                       </tr>
@@ -479,7 +551,7 @@ export default function UserInventoryPage() {
                     <tbody>
                       {filteredProducts.length === 0 ? (
                         <tr className="border-b">
-                          <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                          <td colSpan={9} className="py-8 text-center text-muted-foreground">
                             No se encontraron productos con los filtros actuales.
                           </td>
                         </tr>
@@ -487,11 +559,9 @@ export default function UserInventoryPage() {
                         filteredProducts.map((product: Product) => {
                           const stockStatus = getStockStatusInfo(product)
                           return (
-                            <tr key={product.id} className="border-b transition-colors hover:bg-muted/50">
+                            <tr key={`product-${product.id}`} className="border-b transition-colors hover:bg-muted/50">
                               <td className="py-3 px-4 font-medium">{product.name}</td>
-                              <td className="py-3 px-4">
-                                ${product.price.toFixed(2)}
-                              </td>
+                              <td className="py-3 px-4">${product.price.toFixed(2)}</td>
                               <td className="py-3 px-4 hidden md:table-cell">
                                 <Badge variant="outline" className="font-normal">
                                   {product.category}
@@ -500,21 +570,23 @@ export default function UserInventoryPage() {
                               <td className="py-3 px-4 font-semibold">
                                 <span className={stockStatus.color}>{product.stock}</span>
                               </td>
+                              <td className="py-3 px-4 hidden lg:table-cell font-medium">
+                                {product.minStock}
+                              </td>
                               <td className="py-3 px-4 hidden lg:table-cell">
-                                <Badge
-                                  variant="outline"
-                                  className={`flex gap-1 items-center w-fit ${stockStatus.bgColor}`}
-                                >
+                                <Badge variant="outline" className={`flex gap-1 items-center w-fit ${stockStatus.bgColor}`}>
                                   {stockStatus.icon}
                                   <span className={stockStatus.color}>{stockStatus.text}</span>
                                 </Badge>
+                              </td>
+                              <td className="py-3 px-4 hidden lg:table-cell text-muted-foreground">
+                                {formatDate(product.entryDate || '')}
                               </td>
                               <td className="py-3 px-4 hidden lg:table-cell text-muted-foreground">
                                 {formatDate(product.lastUpdated)}
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <div className="flex justify-end gap-2">
-                                  {/* Usuarios normales solo pueden registrar salidas */}
                                   {product.stock > 0 && (
                                     <Button
                                       variant="ghost"
@@ -536,7 +608,6 @@ export default function UserInventoryPage() {
                   </table>
                 </div>
               </div>
-
               <div className="mt-4 flex justify-end">
                 <div className="text-sm text-muted-foreground">
                   Mostrando {filteredProducts.length} de {products.length} productos
@@ -568,26 +639,23 @@ export default function UserInventoryPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {/* Filtrar solo los movimientos del usuario actual y de tipo salida */}
-                      {sortedMovements
-                        .filter(m => m.user === user?.name && m.type === "exit")
-                        .length === 0 ? (
-                          <tr className="border-b">
-                            <td colSpan={4} className="py-8 text-center text-muted-foreground">
-                              No tiene movimientos registrados.
-                            </td>
-                          </tr>
-                        ) : (
-                          sortedMovements
-                            .filter(m => m.user === user?.name && m.type === "exit")
-                            .map((movement) => (
-                              <tr key={movement.id} className="border-b transition-colors hover:bg-muted/50">
-                                <td className="py-3 px-4 whitespace-nowrap">{formatDate(movement.date)}</td>
-                                <td className="py-3 px-4 font-medium">{movement.productName}</td>
-                                <td className="py-3 px-4 font-semibold">{movement.quantity}</td>
-                                <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{movement.reason}</td>
-                              </tr>
-                            ))
+                      {sortedMovements.filter(m => m.user === user?.name && m.type === "exit").length === 0 ? (
+                        <tr className="border-b">
+                          <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                            No tiene movimientos registrados.
+                          </td>
+                        </tr>
+                      ) : (
+                        sortedMovements
+                          .filter(m => m.user === user?.name && m.type === "exit")
+                          .map((movement) => (
+                            <tr key={`movement-${movement.id}`} className="border-b transition-colors hover:bg-muted/50">
+                              <td className="py-3 px-4 whitespace-nowrap">{formatDate(movement.date)}</td>
+                              <td className="py-3 px-4 font-medium">{movement.productName}</td>
+                              <td className="py-3 px-4 font-semibold">{movement.quantity}</td>
+                              <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">{movement.reason}</td>
+                            </tr>
+                          ))
                       )}
                     </tbody>
                   </table>
@@ -604,7 +672,7 @@ export default function UserInventoryPage() {
           <DialogHeader>
             <DialogTitle>Registrar Consumo de Inventario</DialogTitle>
             <DialogDescription>
-              {selectedProduct ? `Producto: ${selectedProduct.name} ` : ""}
+              {selectedProduct ? `Producto: ${selectedProduct.name}` : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -625,8 +693,8 @@ export default function UserInventoryPage() {
                 type="number"
                 value={movementQuantity}
                 onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  setMovementQuantity(value > 0 ? value : 1);
+                  const value = parseInt(e.target.value) || 0
+                  setMovementQuantity(value > 0 ? value : 1)
                 }}
                 className="col-span-3"
                 min="1"
@@ -671,7 +739,7 @@ export default function UserInventoryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Nuevo diálogo para agregar productos */}
+      {/* Diálogo para agregar nuevos productos */}
       <Dialog open={isAddProductDialogOpen} onOpenChange={setIsAddProductDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -688,9 +756,9 @@ export default function UserInventoryPage() {
               <Input
                 id="name"
                 value={newProduct.name}
-                onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                 className="col-span-3"
-                placeholder="Ej: Monitor Samsung 24&quot;"
+                placeholder='Ej: Monitor Samsung 24"'
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -700,7 +768,7 @@ export default function UserInventoryPage() {
               <Input
                 id="category"
                 value={newProduct.category}
-                onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                 className="col-span-3"
                 placeholder="Ej: Electrónica, Periféricos, etc."
               />
@@ -713,7 +781,7 @@ export default function UserInventoryPage() {
                 id="stock"
                 type="number"
                 value={newProduct.stock || ""}
-                onChange={(e) => setNewProduct({...newProduct, stock: parseInt(e.target.value) || 0})}
+                onChange={(e) => setNewProduct({ ...newProduct, stock: parseInt(e.target.value) || 0 })}
                 className="col-span-3"
                 min="0"
               />
@@ -726,7 +794,7 @@ export default function UserInventoryPage() {
                 id="minimumStock"
                 type="number"
                 value={newProduct.minimumStock || ""}
-                onChange={(e) => setNewProduct({...newProduct, minimumStock: parseInt(e.target.value) || 0})}
+                onChange={(e) => setNewProduct({ ...newProduct, minimumStock: parseInt(e.target.value) || 0 })}
                 className="col-span-3"
                 min="0"
               />
@@ -739,7 +807,7 @@ export default function UserInventoryPage() {
                 id="price"
                 type="number"
                 value={newProduct.price || ""}
-                onChange={(e) => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})}
+                onChange={(e) => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) || 0 })}
                 className="col-span-3"
                 min="0"
                 step="0.01"
@@ -752,7 +820,7 @@ export default function UserInventoryPage() {
               <Input
                 id="location"
                 value={newProduct.location}
-                onChange={(e) => setNewProduct({...newProduct, location: e.target.value})}
+                onChange={(e) => setNewProduct({ ...newProduct, location: e.target.value })}
                 className="col-span-3"
                 placeholder="Ej: Almacén A - Estantería 3"
               />
@@ -765,7 +833,7 @@ export default function UserInventoryPage() {
                 id="entryDate"
                 type="date"
                 value={newProduct.entryDate}
-                onChange={(e) => setNewProduct({...newProduct, entryDate: e.target.value})}
+                onChange={(e) => setNewProduct({ ...newProduct, entryDate: e.target.value })}
                 className="col-span-3"
               />
             </div>
@@ -777,7 +845,7 @@ export default function UserInventoryPage() {
                 id="exitDate"
                 type="date"
                 value={newProduct.exitDate}
-                onChange={(e) => setNewProduct({...newProduct, exitDate: e.target.value})}
+                onChange={(e) => setNewProduct({ ...newProduct, exitDate: e.target.value })}
                 className="col-span-3"
               />
             </div>
