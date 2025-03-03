@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { ThemeProvider } from 'next-themes';
-import { LoadingProvider } from '@/hooks/useLoading';
-import { ToastViewport, ToastProvider } from '@/components/ui/toast';
 import LoadingOverlay from '@/components/layout/loading-overlay';
-import { AuthProvider } from '@/context/auth-context';
 import NoSSR from '@/components/no-ssr';
-import { useLoading } from '@/hooks/useLoading';
+import { ToastProvider, ToastViewport } from '@/components/ui/toast';
+import { AuthProvider } from '@/context/auth-context';
+import { LoadingProvider, useLoading } from '@/hooks/useLoading';
+import { ThemeProvider } from 'next-themes';
+import React, { useEffect, useState } from 'react';
 
 // Componente dedicado para el botón de reseteo
 function ResetButton() {
