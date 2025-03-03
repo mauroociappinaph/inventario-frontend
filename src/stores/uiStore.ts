@@ -4,6 +4,7 @@ import { UI_ACTIONS } from './actionTypes';
 
 // Tipos
 export type SidebarVariant = "default" | "compact" | "expanded";
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface SidebarItem {
   id: string;
@@ -32,6 +33,7 @@ interface UIState {
   activeItemId: string | undefined;
   expandedItems: Record<string, boolean>;
   isDarkTheme: boolean;
+  themeMode: ThemeMode;
   mobileMenuOpen: boolean;
   loadingItems: Record<string, boolean>;
   currentPath: string;
@@ -42,6 +44,7 @@ interface UIState {
   setActiveItemId: (id: string | undefined) => void;
   toggleExpandItem: (itemId: string) => void;
   toggleTheme: () => void;
+  setThemeMode: (mode: ThemeMode) => void;
   setMobileMenuOpen: (isOpen: boolean) => void;
   toggleMobileMenu: () => void;
   setItemLoading: (itemId: string, isLoading: boolean) => void;
@@ -63,6 +66,7 @@ export const useUIStore = create<UIState>()(
       activeItemId: "dashboard",
       expandedItems: {},
       isDarkTheme: false,
+      themeMode: 'light', // Predeterminado a light
       mobileMenuOpen: false,
       loadingItems: {},
       currentPath: "/",
@@ -98,17 +102,19 @@ export const useUIStore = create<UIState>()(
       toggleTheme: () => {
         console.log(`Dispatching action: ${UI_ACTIONS.TOGGLE_THEME}`);
         const newTheme = !get().isDarkTheme;
+        set({
+          isDarkTheme: newTheme,
+          themeMode: newTheme ? 'dark' : 'light'
+        });
+      },
 
-        // Aplicar la clase al documento
-        if (typeof window !== 'undefined') {
-          if (newTheme) {
-            document.documentElement.classList.add("dark");
-          } else {
-            document.documentElement.classList.remove("dark");
-          }
-        }
-
-        set({ isDarkTheme: newTheme });
+      setThemeMode: (mode) => {
+        console.log(`Dispatching action: Setting theme mode to ${mode}`);
+        set({
+          themeMode: mode,
+          // Solo actualizamos isDarkTheme si no estamos en modo sistema
+          ...(mode !== 'system' && { isDarkTheme: mode === 'dark' })
+        });
       },
 
       setMobileMenuOpen: (isOpen) => {

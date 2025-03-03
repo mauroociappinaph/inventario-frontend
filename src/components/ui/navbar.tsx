@@ -1,26 +1,26 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useAuth } from "@/context/auth-context";
 import {
+  BarChart3,
+  Bell,
+  ChevronDown,
   Home,
+  LogOut,
   Package,
   Settings,
-  UserCircle,
-  LogOut,
-  User,
-  Bell,
-  Moon,
-  Sun,
-  ChevronDown,
   ShoppingCart,
-  BarChart3
+  User,
+  UserCircle
 } from "lucide-react";
-import { Button } from "./button";
-import { useAuth } from "@/context/auth-context";
-import { Avatar, AvatarFallback, AvatarImage } from "./simple-avatar";
 import { useTheme } from "next-themes";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { ThemeHelpDialog } from '../theme-help-dialog';
+import { Button } from "./button";
+import { Avatar, AvatarFallback } from "./simple-avatar";
+import { ThemeToggle } from './theme-toggle';
 import {
   Tooltip,
   TooltipContent,
@@ -254,18 +254,14 @@ export function Navbar() {
 
               {/* Botón para cambiar el tema */}
               {mounted && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleTheme}
-                  aria-label={theme === 'dark' ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
-                >
-                  {theme === 'dark' ? (
-                    <Sun className="h-5 w-5 text-sky-300" />
-                  ) : (
-                    <Moon className="h-5 w-5 text-sky-700" />
-                  )}
-                </Button>
+                <div className="flex items-center gap-1">
+                  <ThemeToggle
+                    variant="dropdown"
+                    showLabel={true}
+                    className="ml-2"
+                  />
+                  <ThemeHelpDialog />
+                </div>
               )}
             </div>
           </div>
@@ -274,19 +270,10 @@ export function Navbar() {
           <div className="md:hidden flex items-center gap-2">
             {/* Botón para cambiar el tema en móvil */}
             {mounted && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
+              <ThemeToggle
+                variant="icon"
                 className="mr-2"
-                aria-label={theme === 'dark' ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
-              >
-                {theme === 'dark' ? (
-                  <Sun className="h-5 w-5 text-sky-300" />
-                ) : (
-                  <Moon className="h-5 w-5 text-sky-700" />
-                )}
-              </Button>
+              />
             )}
 
             {/* Mostrar icono de usuario o menú de hamburguesa */}

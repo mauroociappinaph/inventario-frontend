@@ -1,37 +1,39 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { CompactToggle } from "@/components/ui/compact-toggle"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ExportButton } from "@/components/ui/export-button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { SavedFilters } from "@/components/ui/saved-filters"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/context/auth-context"
 import {
+  AlertTriangle,
+  ArrowUpDown,
+  BarChart,
+  CheckCircle2,
+  Download,
+  FileBarChart,
+  History,
+  PackageMinus,
   PackageOpen,
   PackagePlus,
-  PackageMinus,
-  History,
-  AlertTriangle,
-  CheckCircle2,
   SearchIcon,
-  FileBarChart,
-  BarChart,
-  TrendingUp,
   TrendingDown,
-  ArrowUpDown,
-  Download
+  TrendingUp
 } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState } from "react"
 
 // Tipos para los productos y movimientos
 interface Product {
   id: string
   name: string
-
   category: string
   stock: number
   minimumStock: number
@@ -57,7 +59,7 @@ export default function InventoryPage() {
   // Verificar si el usuario es administrador
   const isAdmin = user?.roles?.includes('admin')
 
-
+  // Estado de movimientos de stock
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([
     {
       id: "1",
@@ -111,6 +113,28 @@ export default function InventoryPage() {
     }
   ])
 
+  // Productos del inventario
+  const [products, setProducts] = useState<Product[]>([
+    {
+      id: "1",
+      name: "Laptop HP Pavilion",
+      category: "Computadoras",
+      stock: 12,
+      minimumStock: 5,
+      location: "Bodega A, Estante 3",
+      lastUpdated: "2023-10-15T08:30:00Z"
+    },
+    {
+      id: "2",
+      name: "Monitor Samsung 27\"",
+      category: "Periféricos",
+      stock: 8,
+      minimumStock: 10,
+      location: "Bodega B, Estante 1",
+      lastUpdated: "2023-10-12T14:45:00Z"
+    }
+  ])
+
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [stockFilter, setStockFilter] = useState("all")
@@ -145,7 +169,6 @@ export default function InventoryPage() {
   const filteredProducts = products
     .filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-
                            product.location.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter
       const matchesStock = stockFilter === "all" ||
@@ -230,7 +253,6 @@ export default function InventoryPage() {
       stock: selectedProduct.stock + stockChange,
       lastUpdated: new Date().toISOString()
     }
-    }))
 
     // Añadir el movimiento al historial
     setStockMovements([...stockMovements, newMovement])
@@ -431,11 +453,14 @@ export default function InventoryPage() {
                   </div>
 
                   <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="w-full md:w-[150px]">
-                      <SelectValue placeholder="Categoría" />
+                    <SelectTrigger className="w-full md:w-[180px]">
+                      <div className="flex items-center gap-2">
+                        <PackageOpen className="h-4 w-4" />
+                        <SelectValue placeholder="Categoría" />
+                      </div>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="all">Todas las categorías</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category} value={category}>
                           {category}
@@ -445,22 +470,53 @@ export default function InventoryPage() {
                   </Select>
 
                   <Select value={stockFilter} onValueChange={setStockFilter}>
-                    <SelectTrigger className="w-full md:w-[150px]">
-                      <SelectValue placeholder="Estado de Stock" />
+                    <SelectTrigger className="w-full md:w-[180px]">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        <SelectValue placeholder="Estado de Stock" />
+                      </div>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="low">Stock Bajo</SelectItem>
-                      <SelectItem value="normal">Stock Normal</SelectItem>
+                      <SelectItem value="all">Todos los estados</SelectItem>
+                      <SelectItem value="low">Stock bajo</SelectItem>
+                      <SelectItem value="normal">Stock normal</SelectItem>
                     </SelectContent>
                   </Select>
+
+                  {/* Filtros guardados */}
+                  <SavedFilters
+                    filterType="inventory"
+                    currentFilters={{ searchTerm, categoryFilter, stockFilter }}
+                    onFilterSelect={(filters) => {
+                      setSearchTerm(filters.searchTerm || "");
+                      setCategoryFilter(filters.categoryFilter || "all");
+                      setStockFilter(filters.stockFilter || "all");
+                    }}
+                  />
+
+                  {/* Botón de exportación */}
+                  <ExportButton
+                    data={filteredProducts}
+                    filename="inventario"
+                    headerMap={{
+                      name: "Nombre",
+                      category: "Categoría",
+                      stock: "Stock Actual",
+                      minimumStock: "Stock Mínimo",
+                      location: "Ubicación",
+                      lastUpdated: "Última Actualización"
+                    }}
+                  />
+
+                  {/* Toggle de modo compacto */}
+                  <CompactToggle tableId="inventory-table" />
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="relative overflow-x-auto">
+                  <table className="w-full text-sm" id="inventory-table">
                     <thead>
                       <tr className="border-b bg-muted/50 font-medium">
                         <th className="py-3 px-4 text-left">

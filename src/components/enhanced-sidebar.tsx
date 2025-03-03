@@ -1,22 +1,21 @@
 "use client"
 
-import { KeyboardEvent } from "react"
-import {
-  ChevronDown,
-  ChevronRight,
-  ChevronLeft,
-  Sun,
-  Moon,
-  X,
-  Bell,
-  MessageSquare
-} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/simple-avatar"
-import { useUIStore, SidebarItem, SidebarSection } from "@/stores/uiStore"
-import { useSidebar } from "@/hooks/useSidebar"
-import { useAppTheme } from "@/hooks/useAppTheme"
 import { useAppNavigation } from "@/hooks/useAppNavigation"
+import { useAppTheme } from "@/hooks/useAppTheme"
+import { useSidebar } from "@/hooks/useSidebar"
+import { SidebarItem, SidebarSection, useUIStore } from "@/stores/uiStore"
+import {
+    Bell,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    MessageSquare,
+    X
+} from "lucide-react"
+import { KeyboardEvent } from "react"
+import { ThemeToggle } from './ui/theme-toggle'
 
 // Tipo para la información del usuario
 export interface SidebarUserInfo {
@@ -389,14 +388,10 @@ export function EnhancedSidebar({
             <Button variant="ghost" size="icon" className="h-8 w-8 text-dim-3 hover:text-sidebar-foreground active:scale-95">
               <MessageSquare className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-dim-3 hover:text-sidebar-foreground active:scale-95"
-              onClick={toggleTheme}
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
+            <ThemeToggle
+              variant="icon"
+              className="h-8 w-8"
+            />
           </div>
 
           {/* Contenido personalizado en el footer */}

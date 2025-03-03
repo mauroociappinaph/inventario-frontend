@@ -1,17 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { useToast } from "@/components/ui/use-toast"
-import { Pencil, Plus, Trash2, Search, Filter, ArrowUpDown, Tag, CheckCircle, XCircle, Loader2 } from "lucide-react"
-import { BackendProductStatus, productService } from "@/lib/api/api" // Importamos el servicio de productos existente
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactToggle } from "@/components/ui/compact-toggle"; // Importamos el toggle de modo compacto
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ExportButton } from "@/components/ui/export-button"; // Importamos el botón de exportación
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
+import { BackendProductStatus, productService } from "@/lib/api/api"; // Importamos el servicio de productos existente
+import { ArrowUpDown, CheckCircle, Filter, Loader2, Pencil, Plus, Search, Tag, Trash2, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 // Tipo para los productos
 interface Product {
@@ -329,6 +330,23 @@ export default function ProductsPage() {
                   <SelectItem value="inactive">Inactivo</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Botón de exportación */}
+              <ExportButton
+                data={filteredProducts}
+                filename="productos"
+                headerMap={{
+                  name: "Nombre",
+                  category: "Categoría",
+                  price: "Precio",
+                  stock: "Stock",
+                  status: "Estado",
+                  createdAt: "Fecha de Creación"
+                }}
+              />
+
+              {/* Toggle de modo compacto */}
+              <CompactToggle tableId="products-table" />
             </div>
           </div>
         </CardHeader>
@@ -342,7 +360,7 @@ export default function ProductsPage() {
             <>
               <div className="rounded-md border">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm" id="products-table">
                     <thead>
                       <tr className="border-b bg-muted/50 font-medium">
                         <th className="py-3 px-4 text-left">
