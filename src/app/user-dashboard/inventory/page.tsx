@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/context/auth-context"
+import { Product, StockMovement } from "@/types/inventory.interfaces"
 import {
   AlertTriangle,
   ArrowUpDown,
@@ -26,36 +27,11 @@ import {
   SearchIcon
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
-
 // Importamos el servicio de productos y el tipo para crear productos
 import { CreateProductDto, inventoryService, productService } from "@/lib/api/api"
 
-// Tipos para los productos y movimientos
-interface Product {
-  id: string
-  _id?: string // ID original del backend
-  name: string
-  price: number
-  category: string
-  stock: number
-  minStock: number
-  lastUpdated: string
-  entryDate?: string
-  exitDate?: string
-  lastStockUpdate: string
 
-}
 
-interface StockMovement {
-  id: string
-  productId: string
-  productName: string
-  type: "entry" | "exit" | "adjustment"
-  quantity: number
-  reason: string
-  date: string
-  user: string
-}
 
 export default function UserInventoryPage() {
   const { toast } = useToast()
