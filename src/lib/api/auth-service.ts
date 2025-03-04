@@ -86,6 +86,25 @@ export interface AuthResponse {
 // Tiempo de expiración de la cookie en días (7 días por defecto)
 const COOKIE_EXPIRY_DAYS = 7;
 
+// Función para decodificar el token JWT y extraer su información
+// No valida la firma, solo extrae los datos
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error al parsear token JWT:', error);
+    return null;
+  }
+}
+
 // Servicio de autenticación
 const authService = {
   // Iniciar sesión
@@ -209,7 +228,53 @@ const authService = {
     const localToken = localStorage.getItem('auth_token');
     const cookieToken = Cookies.get('auth_token');
 
-    return localToken !== null || cookieToken !== undefined;
+    // Verificar si el token existe
+    if (!localToken && !cookieToken) return false;
+
+    // Si existe, verificar si está expirado
+    const token = localToken || cookieToken;
+    if (token) {
+      const isExpired = this.isTokenExpired(token);
+      // Si está expirado o está próximo a expirar, renovar automáticamente en segundo plano
+      if (isExpired || this.isTokenExpiringSoon(token)) {
+        console.log('Token expirado o próximo a expirar, iniciando renovación automática');
+        // Intentar renovar automáticamente en segundo plano (sin esperar)
+        this.refreshToken().catch(err => {
+          console.error('Error al renovar token automáticamente:', err);
+          // No hacemos logout aquí para permitir reintento más tarde
+        });
+      }
+
+      // Consideramos como autenticado incluso si está próximo a expirar
+      // porque la renovación ocurrirá en segundo plano
+      return !isExpired;
+    }
+
+    return false;
+  },
+
+  // Verificar si el token JWT está expirado
+  isTokenExpired(token: string): boolean {
+    const payload = parseJwt(token);
+    if (!payload || !payload.exp) return true;
+
+    // La expiración está en segundos, multiplicar por 1000 para obtener milisegundos
+    const expirationTime = payload.exp * 1000;
+    const currentTime = Date.now();
+
+    // Si el token expira en menos de 5 minutos, considerarlo como "a punto de expirar"
+    const timeToExpire = expirationTime - currentTime;
+    const isExpiredOrAlmostExpired = timeToExpire < 5 * 60 * 1000; // 5 minutos
+
+    if (isExpiredOrAlmostExpired) {
+      console.log(`Token expirará en ${timeToExpire / 1000} segundos`);
+    }
+
+    return isExpiredOrAlmostExpired;
+  },
+
+  // Nuevo método para verificar si el token está próximo a expirar (5 minutos)
+  isTokenExpiringSoon(token: string): boolean {
   },
 
   // Obtener el usuario actual
@@ -227,7 +292,77 @@ const authService = {
     const localToken = localStorage.getItem('auth_token');
     const cookieToken = Cookies.get('auth_token');
 
-    return localToken || cookieToken || null;
+    const token = localToken || cookieToken || null;
+
+    // Si el token existe pero está a punto de expirar, intentar renovarlo
+    if (token && this.isTokenExpired(token)) {
+      console.log('Token próximo a expirar, renovando silenciosamente');
+      // Iniciar renovación en background (sin esperar)
+      this.refreshToken().catch(err => {
+        console.error('Error al renovar token automáticamente:', err);
+      });
+    }
+
+    return token;
+  },
+
+  // Renovar el token JWT
+  async refreshToken(): Promise<AuthResponse> {
+    if (typeof window === 'undefined') {
+      return Promise.reject('No se puede renovar token en el servidor');
+    }
+
+    try {
+      console.log('Iniciando renovación de token...');
+
+      const currentToken = this.getToken();
+      if (!currentToken) {
+        console.error('No hay token para renovar');
+        return Promise.reject('No hay token disponible para renovar');
+      }
+
+      // Realizar la petición al endpoint de renovación
+      const response = await axios.get<any>(`${API_URL}/auth/refresh-token`, {
+        headers: {
+          Authorization: `Bearer ${currentToken}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      console.log('Respuesta de renovación de token:', response.data);
+
+      // Extraer datos de la respuesta
+      let authData: AuthResponse;
+
+      if (response.data.data && response.data.data.token) {
+        // Estructura con wrapper
+        authData = {
+          token: response.data.data.token,
+          user: response.data.data.user
+        };
+      } else {
+        // Estructura directa
+        authData = response.data;
+      }
+
+      // Guardar el nuevo token
+      this.saveAuthData(authData);
+      console.log('Token renovado y guardado exitosamente');
+
+      return authData;
+    } catch (error: unknown) {
+      console.error('Error al renovar token:', error);
+
+      // Si hay un error 401, el token ya no es válido para renovar
+      if (error instanceof Error && (error as any).response && (error as any).response.status === 401) {
+        console.log('Token no válido para renovación');
+        // Solo limpiamos el token, pero no redirigimos automáticamente
+        // para permitir que el interceptor maneje esto apropiadamente
+        this.logout(false);
+      }
+
+      return Promise.reject(error);
+    }
   }
 };
 

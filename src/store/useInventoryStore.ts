@@ -49,12 +49,15 @@ export const useInventoryStore = create<InventoryState>()(
       // Obtener estadísticas calculadas
       getStatistics: () => {
         const { products } = get();
+        // Verificar que products es un array
+        const productsArray = Array.isArray(products) ? products : [];
+
         return {
-          totalProducts: products.length,
-          lowStockProducts: products.filter(p => p.stock <= p.minStock).length,
-          totalStock: products.reduce((sum, p) => sum + p.stock, 0),
-          criticalStockPercentage: products.length > 0
-            ? (products.filter(p => p.stock <= p.minStock).length / products.length) * 100
+          totalProducts: productsArray.length,
+          lowStockProducts: productsArray.filter(p => p.stock <= p.minStock).length,
+          totalStock: productsArray.reduce((sum, p) => sum + p.stock, 0),
+          criticalStockPercentage: productsArray.length > 0
+            ? (productsArray.filter(p => p.stock <= p.minStock).length / productsArray.length) * 100
             : 0
         };
       },
@@ -62,35 +65,69 @@ export const useInventoryStore = create<InventoryState>()(
       // Obtener categorías únicas
       getCategories: () => {
         const { products } = get();
-        return Array.from(new Set(products.map(p => p.category)));
+        // Verificar que products es un array
+        const productsArray = Array.isArray(products) ? products : [];
+        return Array.from(new Set(productsArray.map(p => p.category)));
       },
 
       // Obtener productos filtrados
       getFilteredProducts: () => {
         const { products, searchTerm, categoryFilter, stockFilter, sortBy, sortDirection, minPrice, maxPrice } = get();
 
-        return products
-          .filter(product => {
-            const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
-            const matchesStock = stockFilter === "all" ||
-                              (stockFilter === "low" && product.stock <= product.minStock) ||
-                              (stockFilter === "normal" && product.stock > product.minStock);
-            const matchesPrice = product.price >= minPrice && product.price <= maxPrice;
+        // Verificar que products es un array
+        const productsArray = Array.isArray(products) ? products : [];
 
-            return matchesSearch && matchesCategory && matchesStock && matchesPrice;
-          })
-          .sort((a, b) => {
-            let aValue: any = a[sortBy as keyof Product];
-            let bValue: any = b[sortBy as keyof Product];
+        if (productsArray.length === 0) {
+          return [];
+        }
 
-            if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-            if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+        try {
+          return productsArray
+            .filter(product => {
+              if (!product) return false;
 
-            if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-            if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-            return 0;
-          });
+              const matchesSearch = product.name?.toLowerCase().includes(searchTerm?.toLowerCase() || '') || false;
+              const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
+
+              let matchesStock = stockFilter === "all";
+              if (stockFilter === "low" && typeof product.stock === 'number' && typeof product.minStock === 'number') {
+                matchesStock = product.stock <= product.minStock;
+              } else if (stockFilter === "normal" && typeof product.stock === 'number' && typeof product.minStock === 'number') {
+                matchesStock = product.stock > product.minStock;
+              }
+
+              const price = typeof product.price === 'number' ? product.price : 0;
+              const matchesPrice = price >= minPrice && price <= maxPrice;
+
+              return matchesSearch && matchesCategory && matchesStock && matchesPrice;
+            })
+            .sort((a, b) => {
+              if (!a || !b || !sortBy) return 0;
+
+              // Verificar que las propiedades existen
+              const aHasKey = sortBy in a;
+              const bHasKey = sortBy in b;
+
+              if (!aHasKey || !bHasKey) return 0;
+
+              let aValue: any = a[sortBy as keyof Product];
+              let bValue: any = b[sortBy as keyof Product];
+
+              // Manejar valores nulos o indefinidos
+              if (aValue === undefined || aValue === null) aValue = '';
+              if (bValue === undefined || bValue === null) bValue = '';
+
+              if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+              if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+              if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+              if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+              return 0;
+            });
+        } catch (error) {
+          console.error("Error al filtrar productos:", error);
+          return [];
+        }
       },
 
       // Acciones para actualizar el estado

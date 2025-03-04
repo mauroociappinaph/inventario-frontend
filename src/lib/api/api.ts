@@ -1,4 +1,7 @@
 import axios from 'axios';
+import authServiceImport from './auth-service';
+import { apiCache } from './cache';
+import { connectionState, withRetry } from './sync-utils';
 
 // Configuración base de axios
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -10,6 +13,26 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Variable para controlar si ya hay un intento de renovación en curso
+let isRefreshing = false;
+// Cola de promesas pendientes que esperan la renovación del token
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+// Función para procesar la cola de peticiones pendientes
+const processQueue = (error: any, token: string | null = null) => {
+  refreshSubscribers.forEach(callback => {
+    if (token) {
+      callback(token);
+    }
+  });
+  refreshSubscribers = [];
+};
+
+// Función para añadir peticiones a la cola
+const addSubscriber = (callback: (token: string) => void) => {
+  refreshSubscribers.push(callback);
+};
 
 // Interceptor para agregar el token de autenticación a las solicitudes
 api.interceptors.request.use(
@@ -44,13 +67,18 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor para manejar las respuestas
+// Interceptor para manejar las respuestas y renovar tokens
 api.interceptors.response.use(
   (response) => {
+    // Actualizar el estado de la conexión
+    connectionState.lastSuccessTime = Date.now();
+    connectionState.consecutiveFailures = 0;
+    connectionState.hasBackendConnection = true;
+
     // Si la respuesta es exitosa, extraer los datos
     return response.data;
   },
-  (error) => {
+  async (error) => {
     console.error("Error en la petición API:", error);
 
     // Manejar errores comunes
@@ -61,14 +89,95 @@ api.interceptors.response.use(
 
       console.log("Respuesta de error del servidor:", responseData);
 
-      // Si es un error de autenticación (401), redirigir al login
+      // Si es un error de autenticación (401), intentar renovar el token
       if (status === 401) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('auth_token');
-          // Redirigir a la página de login si no estamos ya en ella
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
+        const originalRequest = error.config;
+
+        // Evitar intentos de renovación en peticiones de login/refresh
+        const isAuthRequest = originalRequest.url.includes('/auth/login') ||
+                             originalRequest.url.includes('/auth/refresh-token');
+
+        // Establecer un límite de intentos para evitar bucles infinitos
+        if (!originalRequest._retryCount) {
+          originalRequest._retryCount = 0;
+        }
+
+        const MAX_RETRY_ATTEMPTS = 2; // Máximo 2 intentos de reintento
+
+        if (!isAuthRequest && !originalRequest._retry && originalRequest._retryCount < MAX_RETRY_ATTEMPTS) {
+          // Si no estamos ya renovando, iniciar proceso de renovación
+          if (!isRefreshing) {
+            isRefreshing = true;
+            originalRequest._retry = true;
+            originalRequest._retryCount++;
+
+            console.log(`Intento de renovación #${originalRequest._retryCount}. Token expirado o inválido.`);
+
+            try {
+              // Intentar renovar el token
+              const authResponse = await authServiceImport.refreshToken();
+              const newToken = authResponse.token;
+
+              // Si se renueva exitosamente, actualizar el token en la petición original
+              if (newToken) {
+                console.log("Token renovado exitosamente. Reintentando petición...");
+                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+
+                // Procesar cola de peticiones pendientes
+                processQueue(null, newToken);
+                isRefreshing = false;
+
+                // Reintentar la petición original con el nuevo token
+                return api(originalRequest);
+              }
+            } catch (refreshError) {
+              console.error("Error al renovar token:", refreshError);
+              // Procesar cola con error
+              processQueue(refreshError, null);
+              isRefreshing = false;
+
+              // Marcar la conexión como problemática
+              connectionState.hasBackendConnection = false;
+              connectionState.lastFailureTime = Date.now();
+              connectionState.consecutiveFailures++;
+
+              // No redirigir automáticamente, permitir que el usuario siga usando la app
+              // con datos almacenados en caché y reintentará más tarde
+              console.log("Error de renovación de token. Se usarán datos en caché si están disponibles.");
+
+              return Promise.reject({
+                ...error,
+                isAuthError: true,
+                message: "Error de autenticación. Se usarán datos en caché."
+              });
+            }
+          } else {
+            // Si ya estamos renovando, encolar esta petición
+            console.log("Encolando petición mientras se renueva el token...");
+            return new Promise(resolve => {
+              addSubscriber(token => {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
+                resolve(api(originalRequest));
+              });
+            });
           }
+        } else if (isAuthRequest) {
+          console.log("Error 401 en petición de autenticación");
+          // Para peticiones de auth que fallan con 401, actualizar estado pero no redireccionar automáticamente
+          connectionState.hasAuthError = true;
+          return Promise.reject({
+            ...error,
+            isAuthError: true,
+            message: "Error de autenticación en operación de login/refresh"
+          });
+        } else if (originalRequest._retryCount >= MAX_RETRY_ATTEMPTS) {
+          console.log(`Máximo de intentos de renovación (${MAX_RETRY_ATTEMPTS}) alcanzado.`);
+          connectionState.hasAuthError = true;
+          return Promise.reject({
+            ...error,
+            isAuthError: true,
+            message: "Máximo de intentos de renovación de sesión alcanzado"
+          });
         }
       }
 
@@ -88,6 +197,12 @@ api.interceptors.response.use(
       const isNetworkError = !window.navigator.onLine;
 
       console.log("Error de red o servidor:", error.request);
+
+      // Actualizar el estado de la conexión
+      connectionState.consecutiveFailures++;
+      if (connectionState.consecutiveFailures >= 3) {
+        connectionState.hasBackendConnection = false;
+      }
 
       return Promise.reject({
         status: 503,
@@ -182,17 +297,127 @@ export const convertStatusToFrontend = (backendStatus: string): ProductStatus =>
   return backendStatus === 'activo' ? 'active' : 'inactive';
 };
 
+/**
+ * Función mejorada para realizar peticiones HTTP con caché y reintentos
+ */
+function request<T = any>(
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  endpoint: string,
+  data?: any,
+  options?: {
+    useCache?: boolean;
+    cacheTTL?: number;
+    staleWhileRevalidate?: boolean;
+    retries?: number;
+  }
+): Promise<T> {
+  const {
+    useCache = method === 'GET', // Por defecto, solo cacheamos GETs
+    cacheTTL = 5 * 60 * 1000, // 5 minutos
+    staleWhileRevalidate = true,
+    retries = 3
+  } = options || {};
+
+  // Ruta completa con parámetros query
+  const fullEndpoint = endpoint + (data && method === 'GET' ? convertToQueryParams(data) : '');
+
+  // Función para ejecutar la solicitud real
+  const executeRequest = async (): Promise<T> => {
+    switch (method) {
+      case 'GET':
+        return (await api.get(fullEndpoint)).data;
+      case 'POST':
+        return (await api.post(endpoint, data)).data;
+      case 'PUT':
+        return (await api.put(endpoint, data)).data;
+      case 'DELETE':
+        return (await api.delete(endpoint)).data;
+      default:
+        throw new Error(`Método HTTP no soportado: ${method}`);
+    }
+  };
+
+  // Si es una solicitud GET y se usa caché, intentar recuperar de la caché
+  if (useCache && method === 'GET') {
+    return apiCache.withCache<T>(
+      endpoint,
+      () => withRetry<T>(executeRequest, { maxRetries: retries }),
+      data, // Parámetros para generar la clave de caché
+      {
+        ttl: cacheTTL,
+        staleWhileRevalidate
+      }
+    );
+  }
+
+  // Para otros métodos o si no se usa caché, solo hacer la solicitud con reintentos
+  return withRetry<T>(executeRequest, { maxRetries: retries });
+}
+
+/**
+ * Convierte un objeto a parámetros de consulta URL
+ */
+function convertToQueryParams(params: Record<string, any>): string {
+  if (!params || Object.keys(params).length === 0) return '';
+
+  const queryParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null) {
+      queryParams.append(key, String(value));
+    }
+  }
+
+  const queryString = queryParams.toString();
+  return queryString ? `?${queryString}` : '';
+}
+
 // Servicio de productos
 export const productService = {
   getProducts: async (page = 1, limit = 10, userId?: string) => {
     if (!userId) {
       throw new Error('Usuario no autenticado');
     }
-    return api.get(`/products?page=${page}&limit=${limit}&userId=${userId}`);
+
+    try {
+      const response = await request('GET', '/products', { page, limit, userId }, {
+        cacheTTL: 2 * 60 * 1000, // 2 minutos
+        staleWhileRevalidate: true
+      });
+
+      // Verificar el formato de la respuesta
+      if (response && typeof response === 'object') {
+        // Si la respuesta tiene una propiedad 'data' que es un array
+        if ('data' in response && Array.isArray(response.data)) {
+          return response.data;
+        }
+        // Si la respuesta es directamente un array
+        else if (Array.isArray(response)) {
+          return response;
+        }
+        // Si la respuesta tiene productos en otra propiedad
+        else if ('products' in response && Array.isArray(response.products)) {
+          return response.products;
+        }
+      }
+
+      // Si llegamos aquí, la respuesta no tiene el formato esperado
+      console.error('Formato de respuesta no válido:', response);
+      return [];
+    } catch (error) {
+      console.error('Error al obtener productos:', error);
+      // En caso de error, devolver un array vacío por seguridad
+      return [];
+    }
   },
+
   getProductById: async (id: string) => {
-    return api.get(`/products/${id}`);
+    return request('GET', `/products/${id}`, null, {
+      cacheTTL: 5 * 60 * 1000, // 5 minutos
+      staleWhileRevalidate: true
+    });
   },
+
   createProduct: async (productData: Partial<CreateProductDto>) => {
     try {
       // Convertir la fecha de entrada a un formato que el backend pueda interpretar como Date
@@ -229,7 +454,11 @@ export const productService = {
 
       console.log('Enviando datos al backend:', JSON.stringify(dtoData, null, 2));
 
-      const response = await api.post('/products', dtoData);
+      const response = await request('POST', '/products', dtoData, { useCache: false });
+
+      // Invalidar la caché de productos al crear uno nuevo
+      apiCache.invalidateByPattern('/products');
+
       console.log('Respuesta exitosa del backend:', response);
       return response;
     } catch (error: unknown) {
@@ -247,19 +476,36 @@ export const productService = {
       throw error;
     }
   },
+
   updateProduct: async (id: string, productData: Partial<CreateProductDto>) => {
-    return api.put(`/products/${id}`, productData);
+    const response = await request('PUT', `/products/${id}`, productData, { useCache: false });
+
+    // Invalidar la caché del producto específico y la lista de productos
+    apiCache.invalidate(`/products/${id}`);
+    apiCache.invalidateByPattern('/products');
+
+    return response;
   },
+
   deleteProduct: async (id: string) => {
-    return api.delete(`/products/${id}`);
+    const response = await request('DELETE', `/products/${id}`, null, { useCache: false });
+
+    // Invalidar la caché de productos al eliminar uno
+    apiCache.invalidateByPattern('/products');
+
+    return response;
   },
 };
 
 // Servicio de inventario
 export const inventoryService = {
   getInventoryMovements: async () => {
-    return api.get('/inventory');
+    return request('GET', '/inventory', null, {
+      cacheTTL: 1 * 60 * 1000, // 1 minuto
+      staleWhileRevalidate: true
+    });
   },
+
   createInventoryMovement: async (movementData: any) => {
     // Verificamos que productId esté presente y tenga el formato esperado
     if (!movementData.productId) {
@@ -297,48 +543,78 @@ export const inventoryService = {
     };
 
     console.log('📦 Enviando datos de movimiento al backend:', dataToSend);
-    return api.post('/inventory', dataToSend);
+    return request('POST', '/inventory', dataToSend, { useCache: false });
   },
+
   getInventoryMovementById: async (id: string) => {
-    return api.get(`/inventory/${id}`);
+    return request('GET', `/inventory/${id}`, null, {
+      cacheTTL: 5 * 60 * 1000, // 5 minutos
+      staleWhileRevalidate: true
+    });
   },
 };
 
 // Servicio de stock
 export const stockService = {
   getCurrentStock: async (productId: string) => {
-    return api.get(`/stock/${productId}`);
+    return request('GET', `/stock/${productId}`, null, {
+      cacheTTL: 1 * 60 * 1000, // 1 minuto
+      staleWhileRevalidate: true
+    });
   },
 };
 
 // Nuevos servicios para proveedores
 export const supplierService = {
   getSuppliers: async (page = 1, limit = 10) => {
-    return api.get(`/suppliers?page=${page}&limit=${limit}`);
+    return request('GET', `/suppliers?page=${page}&limit=${limit}`, null, {
+      cacheTTL: 2 * 60 * 1000, // 2 minutos
+      staleWhileRevalidate: true
+    });
   },
   getSupplierById: async (id: string) => {
-    return api.get(`/suppliers/${id}`);
+    return request('GET', `/suppliers/${id}`, null, {
+      cacheTTL: 5 * 60 * 1000, // 5 minutos
+      staleWhileRevalidate: true
+    });
   },
   createSupplier: async (supplierData: any) => {
-    return api.post('/suppliers', supplierData);
+    return request('POST', '/suppliers', supplierData, { useCache: false });
   },
   updateSupplier: async (id: string, supplierData: any) => {
-    return api.put(`/suppliers/${id}`, supplierData);
+    const response = await request('PUT', `/suppliers/${id}`, supplierData, { useCache: false });
+
+    // Invalidar la caché del proveedor específico y la lista de proveedores
+    apiCache.invalidate(`/suppliers/${id}`);
+    apiCache.invalidateByPattern('/suppliers');
+
+    return response;
   },
   deleteSupplier: async (id: string) => {
-    return api.delete(`/suppliers/${id}`);
+    const response = await request('DELETE', `/suppliers/${id}`, null, { useCache: false });
+
+    // Invalidar la caché de proveedores al eliminar uno
+    apiCache.invalidateByPattern('/suppliers');
+
+    return response;
   },
   getSuppliersByCategory: async (category: string) => {
-    return api.get(`/suppliers/category/${category}`);
+    return request('GET', `/suppliers/category/${category}`, null, {
+      cacheTTL: 2 * 60 * 1000, // 2 minutos
+      staleWhileRevalidate: true
+    });
   },
   getSuppliersByProduct: async (productId: string) => {
-    return api.get(`/suppliers/product/${productId}`);
+    return request('GET', `/suppliers/product/${productId}`, null, {
+      cacheTTL: 2 * 60 * 1000, // 2 minutos
+      staleWhileRevalidate: true
+    });
   },
   addProductToSupplier: async (supplierId: string, productId: string) => {
-    return api.put(`/suppliers/${supplierId}/products/${productId}`);
+    return request('PUT', `/suppliers/${supplierId}/products/${productId}`, null, { useCache: false });
   },
   removeProductFromSupplier: async (supplierId: string, productId: string) => {
-    return api.delete(`/suppliers/${supplierId}/products/${productId}`);
+    return request('DELETE', `/suppliers/${supplierId}/products/${productId}`, null, { useCache: false });
   }
 };
 
@@ -348,18 +624,35 @@ export const orderService = {
     let url = `/orders?page=${page}&limit=${limit}`;
     if (status) url += `&status=${status}`;
     if (supplierId) url += `&supplierId=${supplierId}`;
-    return api.get(url);
+    return request('GET', url, null, {
+      cacheTTL: 2 * 60 * 1000, // 2 minutos
+      staleWhileRevalidate: true
+    });
   },
   getOrderById: async (id: string) => {
-    return api.get(`/orders/${id}`);
+    return request('GET', `/orders/${id}`, null, {
+      cacheTTL: 5 * 60 * 1000, // 5 minutos
+      staleWhileRevalidate: true
+    });
   },
   createOrder: async (orderData: any) => {
-    return api.post('/orders', orderData);
+    return request('POST', '/orders', orderData, { useCache: false });
   },
   updateOrder: async (id: string, orderData: any) => {
-    return api.put(`/orders/${id}`, orderData);
+    const response = await request('PUT', `/orders/${id}`, orderData, { useCache: false });
+
+    // Invalidar la caché del pedido específico y la lista de pedidos
+    apiCache.invalidate(`/orders/${id}`);
+    apiCache.invalidateByPattern('/orders');
+
+    return response;
   },
   deleteOrder: async (id: string) => {
-    return api.delete(`/orders/${id}`);
+    const response = await request('DELETE', `/orders/${id}`, null, { useCache: false });
+
+    // Invalidar la caché de pedidos al eliminar uno
+    apiCache.invalidateByPattern('/orders');
+
+    return response;
   },
 };

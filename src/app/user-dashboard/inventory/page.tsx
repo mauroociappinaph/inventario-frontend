@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { ConnectionAlert, ConnectionStatus } from "@/components/ui/connection-status"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,8 +21,11 @@ import ResumenCard from "./components/resumenCard"
 export default function UserInventoryPage() {
   const { toast } = useToast()
   const { user } = useAuth()
+
+  // Los usuarios normales no son administradores
   const isAdmin = false
 
+  // Obtenemos estados y acciones del store
   const {
     products,
     stockMovements,
@@ -48,43 +52,134 @@ export default function UserInventoryPage() {
     setIsAddProductDialogOpen
   } = useInventoryStore()
 
+  // Obtenemos los handlers del inventario
   const {
     isLoading: isHandlerLoading,
     error: handlerError,
+    isOnline,
+    hasBackendConnection,
+    handleCreateProduct,
     handleOpenAddProductDialog,
+    handleSelectProduct,
+    handleOpenMovementDialog,
+    handleProcessMovement,
+    handleSort,
     handleFetchProducts,
     handleAddProductSubmit
-  } = useInventoryHandlers()
+  } = useInventoryHandlers();
 
-  const filteredProducts = getFilteredProducts()
+  // Estado para registrar errores de renderizado
+  const [renderError, setRenderError] = useState<string | null>(null);
 
+  // Wrapper de seguridad para funciones que podrían fallar
+  const safeExecute = (fn: Function, fallback: any = null, ...args: any[]) => {
+    try {
+      return fn(...args);
+    } catch (error: any) {
+      const errorMessage = error?.message || "Error desconocido";
+      console.error(`Error al ejecutar función:`, errorMessage, error);
+      setRenderError(errorMessage);
+      return fallback;
+    }
+  };
 
+  // Obtenemos productos filtrados y estadísticas del store con manejo de errores
+  const filteredProducts = safeExecute(getFilteredProducts, [], []);
+  const statistics = safeExecute(getStatistics, {
+    totalProducts: 0,
+    lowStockProducts: 0,
+    totalStock: 0,
+    criticalStockPercentage: 0
+  }, []);
+
+  // Ordenar movimientos de inventario por fecha (más reciente primero)
+  const sortedMovements = safeExecute(() => {
+    const movements = Array.isArray(stockMovements) ? stockMovements : [];
+    return [...movements].sort((a, b) => {
+      if (!a.date || !b.date) return 0;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+  }, [], []);
+
+  // Cargar productos al iniciar o al cambiar de usuario
   useEffect(() => {
     if (user?.id) {
-      handleFetchProducts(user.id)
+      handleFetchProducts(user.id).catch(error => {
+        console.error("Error al cargar productos:", error);
+        toast({
+          title: "Error al cargar productos",
+          description: error?.message || "No se pudieron cargar los productos. Intente recargar la página.",
+          variant: "destructive"
+        });
+      });
     }
-  }, [user])
+  }, [user]);
 
+  // Agregar loading states locales para UI
   const [isLoading, setIsLoading] = useState({
     products: false,
     movements: false,
     addProduct: false
-  })
+  });
 
+  // Función para reintentar cargar datos cuando falla
+  const handleRetryLoad = () => {
+    if (user?.id) {
+      toast({
+        title: "Reintentando",
+        description: "Intentando cargar los datos de inventario nuevamente."
+      });
 
+      handleFetchProducts(user.id).catch(error => {
+        toast({
+          title: "Persiste el error",
+          description: error?.message || "No se pudieron cargar los productos. Intente más tarde.",
+          variant: "destructive"
+        });
+      });
+    }
+  };
+
+  // Si hay un error de renderizado, mostrar mensaje amigable
+  if (renderError) {
+    return (
+      <div className="container mx-auto py-12 text-center">
+        <div className="bg-destructive/10 p-6 rounded-lg max-w-2xl mx-auto">
+          <h2 className="text-2xl font-bold text-destructive mb-4">Error en el módulo de inventario</h2>
+          <p className="mb-4">No pudimos cargar la información de inventario en este momento.</p>
+          <div className="bg-background p-4 rounded text-left mb-4 font-mono text-sm overflow-auto">
+            {renderError}
+          </div>
+          <p className="mb-6 text-muted-foreground">
+            Este error puede deberse a un problema con la conexión al servidor o al acceder a los datos de inventario.
+          </p>
+          <Button
+            variant="default"
+            className="mx-auto"
+            onClick={handleRetryLoad}
+          >
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-6 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <h1 className="text-3xl font-bold">Consulta de Inventario</h1>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ConnectionStatus compact iconOnly className="mr-2" />
           <Button
             variant="default"
             className="gap-2"
-            onClick={() => toast({
-              title: "Solicitando informe",
-              description: "Se está generando el informe de inventario. Espere por favor."
-            })}
+            onClick={() => {
+              toast({
+                title: "Solicitando informe",
+                description: "Se está generando el informe de inventario. Espere por favor."
+              })
+            }}
           >
             <FileBarChart size={16} />
             Solicitar Informe
@@ -92,7 +187,7 @@ export default function UserInventoryPage() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={handleOpenAddProductDialog}
+            onClick={() => handleOpenAddProductDialog()}
           >
             <PackagePlus size={16} />
             Agregar Producto
@@ -102,6 +197,7 @@ export default function UserInventoryPage() {
 
       <ResumenCard />
       <InventoryFilters />
+      <ConnectionAlert />
 
       <Tabs defaultValue="products" className="w-full">
         <TabsList className="grid w-full md:w-[400px] grid-cols-2">

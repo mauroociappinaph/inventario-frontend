@@ -22,15 +22,30 @@ export default function Home() {
       try {
         // Si estamos autenticados, obtener datos reales
         if (isAuthenticated) {
+          // Verificación adicional de token para evitar errores 401
+          const token = localStorage.getItem('auth_token');
+          if (!token) {
+            console.log('Token no disponible. Usando datos simulados...');
+            const simulatedStats = dashboardService.getSimulatedInventoryStats();
+            setInventoryStats(simulatedStats);
+            return;
+          }
+
+          console.log('Solicitando estadísticas reales con token...');
           const stats = await dashboardService.getInventoryStats();
           setInventoryStats(stats);
         } else {
-          // Si no, usar datos simulados
+          // Si no estamos autenticados, usar datos simulados
+          console.log('Usuario no autenticado. Usando datos simulados...');
           const simulatedStats = dashboardService.getSimulatedInventoryStats();
           setInventoryStats(simulatedStats);
         }
       } catch (error) {
         console.error('Error al obtener estadísticas:', error);
+        // En caso de error (incluyendo 401), mostrar datos simulados
+        console.log('Error en la petición. Usando datos simulados como fallback...');
+        const simulatedStats = dashboardService.getSimulatedInventoryStats();
+        setInventoryStats(simulatedStats);
       }
     };
 

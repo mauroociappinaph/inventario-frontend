@@ -181,12 +181,17 @@ class DashboardService {
     try {
       const token = authService.getToken();
       if (!token) {
-        throw new Error('No se encontró token de autenticación');
+        console.warn('⚠️ [DashboardService] No hay token de autenticación disponible.');
+        // Retornar datos simulados en lugar de lanzar un error
+        console.log('🔄 [DashboardService] Usando datos simulados como fallback...');
+        return this.getSimulatedInventoryStats();
       }
 
       console.log('🔍 [DashboardService] Solicitando estadísticas generales de inventario...');
       const response = await API.get('/inventory/statistics', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        // Configuración de tiempo de espera
+        timeout: 10000 // 10 segundos
       });
       console.log('📊 [DashboardService] Respuesta de estadísticas generales recibida:', response.data);
 
@@ -262,14 +267,33 @@ class DashboardService {
         console.log('📊 [DashboardService] Actualizando datos de ROI en respuesta general:', JSON.stringify(roiData, null, 2));
         responseData.roi = roiData;
       } else {
-        console.log('📊 [DashboardService] Usando datos de ROI de respuesta general:', responseData.roi);
+        console.log('�� [DashboardService] Usando datos de ROI de respuesta general:', responseData.roi);
       }
 
       return responseData;
     } catch (error) {
       console.error('❌ [DashboardService] Error al obtener estadísticas de inventario:', error);
-      this.handleApiError(error);
-      throw error;
+
+      // Verificar si es un error de autenticación
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        console.warn('⚠️ [DashboardService] Error de autenticación (401). Token inválido o expirado.');
+
+        // Limpiar token inválido
+        localStorage.removeItem('auth_token');
+
+        // Redirigir al login sólo si estamos en una página protegida
+        const currentPath = window.location.pathname;
+        if (currentPath.includes('/dashboard') || currentPath.includes('/user-dashboard')) {
+          console.log('🔄 [DashboardService] Redirigiendo a login debido a sesión expirada...');
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 100);
+        }
+      }
+
+      // En cualquier caso de error, retornar datos simulados como fallback
+      console.log('🔄 [DashboardService] Retornando datos simulados debido al error...');
+      return this.getSimulatedInventoryStats();
     }
   }
 

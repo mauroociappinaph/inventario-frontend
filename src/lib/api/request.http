@@ -1,0 +1,206 @@
+@baseUrl = http://localhost:3001
+@authToken = your_jwt_token_here
+
+###
+# AUTENTICACIÓN
+###
+
+### Login de usuario
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "usuario@example.com",
+  "password": "contraseña123"
+}
+
+### Registro de usuario
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "nuevo@example.com",
+  "password": "contraseña123",
+  "companyName": "Mi Empresa",
+  "phone": "1234567890"
+}
+
+###
+# PRODUCTOS
+###
+
+### Obtener todos los productos
+GET {{baseUrl}}/products?page=1&limit=10&userId=userId123
+Authorization: Bearer {{authToken}}
+
+### Obtener un producto por ID
+GET {{baseUrl}}/products/productId123
+Authorization: Bearer {{authToken}}
+
+### Crear un nuevo producto
+POST {{baseUrl}}/products
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Nuevo Producto",
+  "description": "Descripción del producto",
+  "price": 19.99,
+  "stock": 100,
+  "entryDate": "{{$datetime iso8601}}",
+  "category": "Categoría",
+  "minStock": 10,
+  "userId": "userId123"
+}
+
+### Actualizar un producto
+PUT {{baseUrl}}/products/productId123
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Producto Actualizado",
+  "price": 29.99,
+  "stock": 150,
+  "minStock": 15
+}
+
+### Eliminar un producto
+DELETE {{baseUrl}}/products/productId123
+Authorization: Bearer {{authToken}}
+
+###
+# INVENTARIO Y MOVIMIENTOS
+###
+
+### Obtener todos los movimientos de inventario
+GET {{baseUrl}}/inventory
+Authorization: Bearer {{authToken}}
+
+### Obtener un movimiento específico por ID
+GET {{baseUrl}}/inventory/movementId123
+Authorization: Bearer {{authToken}}
+
+### Crear un nuevo movimiento de inventario
+POST {{baseUrl}}/inventory
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "productId": "productId123",
+  "movementType": "in",
+  "quantity": 10,
+  "reason": "Reposición de stock",
+  "date": "{{$datetime iso8601}}",
+  "userId": "userId123"
+}
+
+###
+# STOCK
+###
+
+### Obtener stock actual de un producto
+GET {{baseUrl}}/stock/productId123
+Authorization: Bearer {{authToken}}
+
+###
+# PROVEEDORES
+###
+
+### Obtener todos los proveedores
+GET {{baseUrl}}/suppliers?page=1&limit=10
+Authorization: Bearer {{authToken}}
+
+### Obtener un proveedor por ID
+GET {{baseUrl}}/suppliers/supplierId123
+Authorization: Bearer {{authToken}}
+
+### Crear un nuevo proveedor
+POST {{baseUrl}}/suppliers
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Nuevo Proveedor",
+  "email": "proveedor@example.com",
+  "phone": "1234567890",
+  "address": "Dirección del proveedor",
+  "category": "Categoría"
+}
+
+### Actualizar un proveedor
+PUT {{baseUrl}}/suppliers/supplierId123
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Proveedor Actualizado",
+  "email": "actualizado@example.com",
+  "phone": "0987654321"
+}
+
+### Eliminar un proveedor
+DELETE {{baseUrl}}/suppliers/supplierId123
+Authorization: Bearer {{authToken}}
+
+### Obtener proveedores por categoría
+GET {{baseUrl}}/suppliers/category/categoría123
+Authorization: Bearer {{authToken}}
+
+### Obtener proveedores relacionados con un producto
+GET {{baseUrl}}/suppliers/product/productId123
+Authorization: Bearer {{authToken}}
+
+### Añadir un producto a un proveedor
+PUT {{baseUrl}}/suppliers/supplierId123/products/productId123
+Authorization: Bearer {{authToken}}
+
+### Eliminar un producto de un proveedor
+DELETE {{baseUrl}}/suppliers/supplierId123/products/productId123
+Authorization: Bearer {{authToken}}
+
+###
+# PEDIDOS
+###
+
+### Obtener todos los pedidos
+GET {{baseUrl}}/orders?page=1&limit=10&status=pendiente&supplierId=supplierId123
+Authorization: Bearer {{authToken}}
+
+### Obtener un pedido por ID
+GET {{baseUrl}}/orders/orderId123
+Authorization: Bearer {{authToken}}
+
+### Crear un nuevo pedido
+POST {{baseUrl}}/orders
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "supplierId": "supplierId123",
+  "products": [
+    {
+      "productId": "productId123",
+      "quantity": 10,
+      "price": 19.99
+    }
+  ],
+  "totalAmount": 199.90,
+  "status": "pendiente",
+  "expectedDeliveryDate": "{{$datetime iso8601 7 d}}",
+  "notes": "Notas sobre el pedido"
+}
+
+### Actualizar un pedido
+PUT {{baseUrl}}/orders/orderId123
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "status": "completado",
+  "actualDeliveryDate": "{{$datetime iso8601}}"
+}
+
+### Eliminar un pedido
+DELETE {{baseUrl}}/orders/orderId123
+Authorization: Bearer {{authToken}}

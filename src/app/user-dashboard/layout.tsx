@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Moon, Sun } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { RoleRedirect } from '@/components/role-redirect'
+import { Button } from "@/components/ui/button"
+import { ConnectionAlert, ConnectionStatus } from '@/components/ui/ConnectionStatus'
+import { ToastContainer } from '@/hooks/useToast'
+import { Moon, Sun } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export default function UserDashboardLayout({
   children,
@@ -33,6 +35,12 @@ export default function UserDashboardLayout({
   return (
     <RoleRedirect adminOnly={false}>
       <div className="min-h-screen bg-background text-foreground">
+        {/* Alerta de conexión en la parte superior */}
+        <ConnectionAlert />
+
+        {/* Contenedor de notificaciones toast */}
+        <ToastContainer />
+
         <div className="fixed top-4 right-4 z-50">
           <Button
             variant="ghost"
@@ -43,9 +51,13 @@ export default function UserDashboardLayout({
             {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
           </Button>
         </div>
+
         <main className="pt-4">
           {children}
         </main>
+
+        {/* Estado de conexión y token en la esquina inferior derecha */}
+        <ConnectionStatus />
       </div>
     </RoleRedirect>
   )

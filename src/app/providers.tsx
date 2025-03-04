@@ -5,6 +5,7 @@ import NoSSR from '@/components/no-ssr';
 import { ToastProvider, ToastViewport } from '@/components/ui/toast';
 import { AuthProvider } from '@/context/auth-context';
 import { LoadingProvider, useLoading } from '@/hooks/useLoading';
+import { initAutoRenew } from '@/lib/api/auto-renew';
 import { ThemeProvider } from 'next-themes';
 import React, { useEffect, useState } from 'react';
 
@@ -63,6 +64,21 @@ function ClientThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Componente para inicializar la renovación automática de tokens
+function AutoRenew() {
+  useEffect(() => {
+    // Solo inicializar en el cliente
+    if (typeof window !== 'undefined') {
+      console.log('Inicializando sistema de renovación automática de tokens');
+      initAutoRenew();
+    }
+
+    // No es necesario cleanup ya que esto debe ejecutarse durante toda la vida de la aplicación
+  }, []);
+
+  return null; // Este componente no renderiza nada
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <NoSSR>
@@ -74,6 +90,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
               <LoadingOverlay />
               {process.env.NODE_ENV === 'development' && <ResetButton />}
               <ToastViewport />
+              <AutoRenew />
             </ToastProvider>
           </AuthProvider>
         </LoadingProvider>

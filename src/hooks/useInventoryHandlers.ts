@@ -1,8 +1,20 @@
 import { useToast } from '@/components/ui/use-toast';
+import { productService } from '@/lib/api/api';
+import { apiCache } from '@/lib/api/cache';
+import { useSyncUtils } from '@/lib/api/sync-utils';
 import { useInventoryStore } from '@/store/useInventoryStore';
 import { Product } from '@/types/inventory.interfaces';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { validateProduct } from '../lib/validation-utils';
+
+/**
+ * Verifica si un valor es un array válido de productos
+ */
+function isValidProductsArray(data: any): data is Product[] {
+  return Array.isArray(data) && data.every(item =>
+    typeof item === 'object' && item !== null && 'id' in item && 'name' in item
+  );
+}
 
 /**
  * Hook personalizado que encapsula los manejadores de eventos relacionados con el inventario.
@@ -14,6 +26,24 @@ export const useInventoryHandlers = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Utilizar el hook de sincronización
+  const { withRetry, isOnline, hasBackendConnection } = useSyncUtils();
+
+  // Mostrar indicadores de estado cuando cambia la conexión
+  useEffect(() => {
+    if (!isOnline) {
+      showErrorToast(
+        "Sin conexión a Internet",
+        "Algunas funciones podrían no estar disponibles. Se guardarán los cambios localmente."
+      );
+    } else if (!hasBackendConnection) {
+      showErrorToast(
+        "Problemas de conexión con el servidor",
+        "Estamos experimentando problemas para conectar con el servidor. Intentándolo nuevamente..."
+      );
+    }
+  }, [isOnline, hasBackendConnection]);
+
   /**
    * Maneja la carga de productos
    */
@@ -22,17 +52,52 @@ export const useInventoryHandlers = () => {
     setIsLoading(true);
 
     try {
-      if (store.fetchProducts) {
-        await store.fetchProducts(userId);
-      } else {
-        // Implementación alternativa si el método no existe en el store
-        // En un caso real, aquí se haría una llamada a la API
-        await new Promise(resolve => setTimeout(resolve, 500));
-        console.log('Simulando fetch de productos para el usuario:', userId);
+      // Usar el servicio de productos con caché mejorada
+      const response = await productService.getProducts(1, 1000, userId);
+
+      // Verificar que la respuesta sea un array de productos
+      if (!response) {
+        throw new Error("No se recibieron datos del servidor");
       }
+
+      let products: Product[];
+
+      // Si la respuesta es un objeto con data, intentar extraer los productos
+      if (typeof response === 'object' && response !== null && 'data' in response) {
+        const { data } = response as any;
+        if (isValidProductsArray(data)) {
+          products = data;
+        } else {
+          console.error("Formato de respuesta incorrecto:", data);
+          throw new Error("El formato de los datos recibidos no es válido");
+        }
+      }
+      // Si la respuesta es directamente un array
+      else if (isValidProductsArray(response)) {
+        products = response;
+      }
+      // Si no es ninguno de los formatos esperados
+      else {
+        console.error("Formato de respuesta incorrecto:", response);
+        throw new Error("El formato de los datos recibidos no es válido");
+      }
+
+      // Ahora que tenemos un array verificado, actualizamos el store
+      store.setProducts(products);
     } catch (err: any) {
+      console.error("Error al cargar productos:", err);
       setError(err.message || 'Error al cargar los productos');
       showErrorToast("Error", err.message || "No se pudieron cargar los productos");
+
+      // Si hay un error y no hay productos cargados, podríamos utilizar datos en caché
+      const cachedData = apiCache.get<Product[]>('/products', { userId, page: 1, limit: 1000 }, { staleWhileRevalidate: true });
+      if (cachedData && isValidProductsArray(cachedData) && store.products.length === 0) {
+        showInfoToast("Usando datos en caché", "Mostrando la última versión disponible de los productos.");
+        store.setProducts(cachedData);
+      } else if (store.products.length === 0) {
+        // Si no hay productos en la caché ni en el store, iniciamos con un array vacío
+        store.setProducts([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -248,10 +313,23 @@ export const useInventoryHandlers = () => {
     });
   };
 
+  /**
+   * Función para mostrar una notificación informativa
+   */
+  const showInfoToast = (title: string, description: string) => {
+    toast({
+      title,
+      description,
+      variant: "default" // O podríamos tener una variante específica para información
+    });
+  };
+
   return {
     // Estado
     isLoading,
     error,
+    isOnline,
+    hasBackendConnection,
 
     // Manejadores
     handleCreateProduct,
@@ -268,6 +346,7 @@ export const useInventoryHandlers = () => {
 
     // Utilidades
     showSuccessToast,
-    showErrorToast
+    showErrorToast,
+    showInfoToast
   };
 };

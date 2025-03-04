@@ -1,7 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService, { User } from '@/lib/api/auth-service';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 // Definición del tipo para el contexto
 interface AuthContextType {
@@ -41,22 +41,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUser = async () => {
     try {
       setLoading(true);
-      // Verificar si hay un token válido
+
+      // Obtener el token directamente
+      const token = authService.getToken();
+
+      // Si no hay token, no estamos autenticados
+      if (!token) {
+        console.log('No hay token de autenticación disponible');
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Verificar si el token es válido (básicamente si existe)
       if (authService.isAuthenticated()) {
         // Obtener el usuario del almacenamiento local
         const currentUser = authService.getCurrentUser();
         if (currentUser) {
+          console.log('Usuario cargado correctamente:', currentUser.email);
           setUser(currentUser);
 
           // Verificar si el usuario tiene rol de administrador
-          const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+          const userData = typeof window !== 'undefined' ?
+            JSON.parse(localStorage.getItem('user_data') || '{}') : {};
           const userRoles = userData.roles || [];
           setIsAdmin(userRoles.includes('admin'));
+        } else {
+          console.warn('Token existe pero no hay datos de usuario');
+          // Si hay token pero no hay datos de usuario, limpiar el token
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth_token');
+          }
+          setUser(null);
         }
+      } else {
+        console.log('No autenticado según servicio de autenticación');
+        setUser(null);
       }
     } catch (err) {
       console.error('Error al cargar el usuario:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar el usuario');
+      setUser(null);
     } finally {
       setLoading(false);
     }
