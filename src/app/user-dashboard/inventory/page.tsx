@@ -215,7 +215,7 @@ export default function UserInventoryPage() {
 
         <TabsContent value="movements" className="mt-6">
           <MovementsTable
-            movements={stockMovements}
+            movements={Array.isArray(stockMovements) ? stockMovements : []}
             userName={user?.name}
           />
         </TabsContent>

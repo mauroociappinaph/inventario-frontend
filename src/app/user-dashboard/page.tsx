@@ -19,11 +19,15 @@ export default function UserDashboard() {
   const { inventoryStats, inventoryStatsLoading } = useInventory()
   const { stockMovements } = useInventoryStore()
 
-  // Ordenar movimientos por fecha (más recientes primero)
-  const recentMovements = useMemo(() => {
-    return [...(stockMovements || [])]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 3); // Mostrar solo los 3 más recientes
+  // Ordenar movimientos de inventario por fecha (más reciente primero)
+  const sortedMovements = useMemo(() => {
+    const movements = Array.isArray(stockMovements) ? stockMovements : [];
+    return movements
+      .sort((a, b) => {
+        if (!a?.date || !b?.date) return 0;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      })
+      .slice(0, 3); // Solo mostrar los 3 más recientes
   }, [stockMovements]);
 
   // Simular carga de datos
@@ -365,13 +369,13 @@ export default function UserDashboard() {
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-12 w-full" />
               </div>
-            ) : recentMovements.length === 0 ? (
+            ) : sortedMovements.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No hay movimientos registrados.
               </div>
             ) : (
               <div className="space-y-4">
-                {recentMovements.map((movement, index) => (
+                {sortedMovements.map((movement, index) => (
                   <div key={movement.id || index} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${

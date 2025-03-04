@@ -42,7 +42,7 @@ interface MovementData {
 export function InventoryChart() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const { movements, inventoryStats, inventoryStatsLoading } = useInventory()
+  const { stockMovements, inventoryStats, inventoryStatsLoading } = useInventory()
   const [chartData, setChartData] = useState<MovementData[]>([])
 
   useEffect(() => {
@@ -63,6 +63,7 @@ export function InventoryChart() {
         const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
 
         // Obtener datos reales de los movimientos
+        const movements = Array.isArray(stockMovements) ? stockMovements : [];
         const monthMovements = movements.filter(m => {
           const moveDate = new Date(m.date)
           return moveDate >= monthStart && moveDate <= monthEnd
@@ -82,7 +83,7 @@ export function InventoryChart() {
     }
 
     prepareMovementData()
-  }, [movements])
+  }, [stockMovements])
 
   // Colores para los gráficos
   const colors = {

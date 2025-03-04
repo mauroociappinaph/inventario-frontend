@@ -1,5 +1,6 @@
-import { useInventoryStore } from '@/stores/inventoryStore';
-import { Product } from '@/stores/inventoryTypes';
+import { useAuth } from '@/context/auth-context';
+import { useInventoryStore } from '@/store/useInventoryStore';
+import { Product } from '@/types/inventory.interfaces';
 import axios, { AxiosError } from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -63,30 +64,35 @@ interface InventoryApiStats {
   };
 }
 
+interface Filters {
+  search: string;
+  category: string;
+  stockStatus: string;
+}
+
 /**
  * Hook personalizado para manejar el inventario con funcionalidades adicionales
  * como filtrado, ordenamiento y cálculos.
  */
 export function useInventory() {
-  // Obtener el estado y las acciones del store
+  const { user } = useAuth();
   const {
     products,
-    categories,
-    suppliers,
-    movements,
+    stockMovements,
     isLoading,
     error,
-    selectedProductId,
-    filters,
-    setFilters,
-    resetFilters,
     fetchProducts,
-    fetchCategories,
-    fetchSuppliers,
-    fetchMovements,
-    setSelectedProductId
+    fetchStockMovements
   } = useInventoryStore();
-  // Estado para almacenar estadísticas del servidor
+
+  // Estado para filtros
+  const [filters, setFilters] = useState<Filters>({
+    search: '',
+    category: '',
+    stockStatus: 'todos'
+  });
+
+  // Estado para estadísticas
   const [inventoryApiStats, setInventoryApiStats] = useState<InventoryApiStats | null>(null);
   const [inventoryStatsLoading, setInventoryStatsLoading] = useState<boolean>(false);
   const [inventoryStatsError, setInventoryStatsError] = useState<string | null>(null);
@@ -98,19 +104,26 @@ export function useInventory() {
     direction: 'asc'
   });
 
+  // Estado para producto seleccionado
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+
   // Cargar datos al montar el componente
   useEffect(() => {
     const loadData = async () => {
-      // Solo cargar los datos si están vacíos
-      if (products.length === 0) await fetchProducts();
-      if (categories.length === 0) await fetchCategories();
-      if (suppliers.length === 0) await fetchSuppliers();
-      if (movements.length === 0) await fetchMovements();
+      if (user?.id) {
+        try {
+          await Promise.all([
+            fetchProducts(user.id),
+            fetchStockMovements(user.id)
+          ]);
+        } catch (error) {
+          console.error('Error al cargar datos:', error);
+        }
+      }
     };
 
     loadData();
-  }, [products.length, categories.length, suppliers.length, movements.length,
-      fetchProducts, fetchCategories, fetchSuppliers, fetchMovements]);
+  }, [user?.id, fetchProducts, fetchStockMovements]);
 
   // Cargar estadísticas desde la API
   useEffect(() => {
@@ -258,7 +271,6 @@ export function useInventory() {
       const searchTerm = filters.search.toLowerCase();
       filtered = filtered.filter(product =>
         product.name.toLowerCase().includes(searchTerm) ||
-        product.supplier.toLowerCase().includes(searchTerm) ||
         product.category.toLowerCase().includes(searchTerm)
       );
     }
@@ -266,12 +278,6 @@ export function useInventory() {
     if (filters.category) {
       filtered = filtered.filter(product =>
         product.category === filters.category
-      );
-    }
-
-    if (filters.supplier) {
-      filtered = filtered.filter(product =>
-        product.supplier === filters.supplier
       );
     }
 
@@ -426,6 +432,7 @@ export function useInventory() {
       : 0;
 
     // Simular movimientos para tendencias
+    const movements = Array.isArray(stockMovements) ? stockMovements : [];
     const totalEntries = movements.filter(m => m.type === 'entrada').length;
     const totalExits = movements.filter(m => m.type === 'salida').length;
 
@@ -492,14 +499,19 @@ export function useInventory() {
       stockHealth: determineStockHealth(lowStockCount, totalProducts),
       isFromApi: false
     };
-  }, [inventoryApiStats, products, movements]);
+  }, [inventoryApiStats, products, stockMovements]);
+
+  // Función para resetear filtros
+  const resetFilters = () => setFilters({
+    search: '',
+    category: '',
+    stockStatus: 'todos'
+  });
 
   return {
     // Datos
     products,
-    categories,
-    suppliers,
-    movements,
+    stockMovements,
     filteredProducts: filteredAndSortedProducts,
     selectedProduct,
 
@@ -520,13 +532,13 @@ export function useInventory() {
 
     // Helpers
     getProductById: (id: string) => products.find(p => p.id === id),
-    getCategoryById: (id: string) => categories.find(c => c.id === id),
-    getSupplierById: (supplierId: string) => suppliers.find(s => s.id === supplierId),
+    getCategoryById: (id: string) => {
+      const categories = useInventoryStore.getState().getCategories();
+      return categories.find(c => c === id);
+    },
 
     // Refresh de datos
     refreshProducts: fetchProducts,
-    refreshCategories: fetchCategories,
-    refreshSuppliers: fetchSuppliers,
-    refreshMovements: fetchMovements,
+    refreshStockMovements: fetchStockMovements,
   };
 }

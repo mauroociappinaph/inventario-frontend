@@ -1,7 +1,7 @@
 import { inventoryService, productService } from '@/lib/api/api';
 import { apiCache } from '@/lib/api/cache';
 import { processProductsResponse } from '@/lib/product-utils';
-import { FilterPreset, InventoryState, Product } from '@/types/inventory.interfaces';
+import { FilterPreset, InventoryState, Product, StockMovement } from '@/types/inventory.interfaces';
 import { getFilteredAndSortedProducts, getUniqueCategories } from '@/utils/filter-utils';
 import { isValidProductId, prepareMovementData, updateProductList, updateProductStock } from '@/utils/movement-utils';
 import { create } from 'zustand';
@@ -256,30 +256,35 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       // Función para cargar movimientos
-      fetchStockMovements: async (userId: string) => {
+      fetchStockMovements: async (userId: string): Promise<StockMovement[]> => {
         const store = get();
         set({ isLoading: true, error: null });
 
         try {
-          // Obtener movimientos del servicio
-          const response = await inventoryService.getInventoryMovements(userId);
-
-          // Actualizar el store con los movimientos
-          set({ stockMovements: response });
-
-          return response;
-        } catch (err: any) {
-          console.error("Error al cargar movimientos:", err);
-          const errorMessage = err.message || 'Error al cargar los movimientos';
-          set({ error: errorMessage });
-
-          // Intentar usar caché si no hay movimientos
-          const cachedData = apiCache.get('/movements', { userId }, { staleWhileRevalidate: true });
-          if (cachedData && Array.isArray(cachedData) && store.stockMovements.length === 0) {
-            set({ stockMovements: cachedData });
+          const response = await inventoryService.getInventoryMovements();
+          if (response && Array.isArray(response)) {
+            const filteredMovements = response.filter(movement => movement.user === userId);
+            set({ stockMovements: filteredMovements });
+            return filteredMovements;
+          } else {
+            console.warn('No se encontraron movimientos o el formato es inválido');
+            // Si no hay respuesta válida, mantener los movimientos existentes
+            if (store.stockMovements.length > 0) {
+              console.log('Usando movimientos almacenados localmente');
+              return store.stockMovements;
+            }
+            set({ stockMovements: [] });
+            return [];
           }
-
-          throw err;
+        } catch (error) {
+          console.error('Error al obtener movimientos:', error);
+          set({ error: 'Error al cargar los movimientos de inventario' });
+          // En caso de error, mantener los movimientos existentes
+          if (store.stockMovements.length > 0) {
+            console.log('Usando movimientos almacenados localmente debido al error');
+            return store.stockMovements;
+          }
+          return [];
         } finally {
           set({ isLoading: false });
         }

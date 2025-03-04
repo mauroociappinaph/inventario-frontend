@@ -10,9 +10,11 @@ interface MovementsTableProps {
 }
 
 export default function MovementsTable({
-  movements,
+  movements = [],
   userName = "Usuario",
 }: MovementsTableProps) {
+  const safeMovements = Array.isArray(movements) ? movements : [];
+
   return (
     <Card>
       <CardHeader>
@@ -33,14 +35,14 @@ export default function MovementsTable({
                 </tr>
               </thead>
               <tbody>
-                {movements.length === 0 ? (
+                {safeMovements.length === 0 ? (
                   <tr className="border-b">
                     <td colSpan={6} className="py-8 text-center text-muted-foreground">
                       No hay movimientos registrados.
                     </td>
                   </tr>
                 ) : (
-                  movements.map((movement, index) => (
+                  safeMovements.map((movement, index) => (
                     <tr key={`movement-${movement.id || index}-${Date.now()}`} className="border-b transition-colors hover:bg-muted/50">
                       <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">
                         {formatDate(movement.date)}
