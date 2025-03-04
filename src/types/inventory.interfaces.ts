@@ -42,6 +42,10 @@ export interface InventoryState {
   products: Product[];
   stockMovements: StockMovement[];
 
+  // Estados de carga y error
+  isLoading: boolean;
+  error: string | null;
+
   // Filtros
   searchTerm: string;
   categoryFilter: string;
@@ -128,8 +132,12 @@ export interface InventoryState {
   setNewProduct: (product: Partial<InventoryState['newProduct']>) => void;
   resetNewProductForm: () => void;
 
+  // Acciones para estados de carga y error
+  setIsLoading: (isLoading: boolean) => void;
+  setError: (error: string | null) => void;
+
   // Funciones principales
-  fetchProducts: (userId: string) => Promise<void>;
+  fetchProducts: (userId: string) => Promise<Product[]>;
   openMovementDialog: (product: Product, type: "entry" | "exit") => void;
   handleStockMovement: (userId: string, userName: string) => Promise<void>;
   resetMovementForm: () => void;

@@ -18,6 +18,7 @@ import MovementsTable from "./components/MovementsTable"
 import ProductsTable from "./components/ProductsTable"
 import ResumenCard from "./components/resumenCard"
 
+
 export default function UserInventoryPage() {
   const { toast } = useToast()
   const { user } = useAuth()
@@ -56,16 +57,9 @@ export default function UserInventoryPage() {
   const {
     isLoading: isHandlerLoading,
     error: handlerError,
-    isOnline,
-    hasBackendConnection,
-    handleCreateProduct,
+    handleSubmitProduct,
     handleOpenAddProductDialog,
-    handleSelectProduct,
-    handleOpenMovementDialog,
-    handleProcessMovement,
-    handleSort,
-    handleFetchProducts,
-    handleAddProductSubmit
+    handleFetchProducts
   } = useInventoryHandlers();
 
   // Estado para registrar errores de renderizado
@@ -195,7 +189,7 @@ export default function UserInventoryPage() {
         </div>
       </div>
 
-      <ResumenCard />
+    <ResumenCard products={products} stockMovements={stockMovements} />
       <InventoryFilters />
       <ConnectionAlert />
 
@@ -249,7 +243,15 @@ export default function UserInventoryPage() {
               Complete los datos del producto a agregar al inventario.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleAddProductSubmit}>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (user) {
+              handleSubmitProduct(user.id);
+            } else {
+              // Mostrar mensaje si no hay usuario
+              console.error("No hay usuario autenticado");
+            }
+          }}>
             <div className="grid gap-4 py-4">
               {['name', 'category', 'price', 'stock', 'minStock'].map((field) => (
                 <div key={field} className="grid grid-cols-4 items-center gap-4">

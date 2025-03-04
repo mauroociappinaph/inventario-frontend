@@ -1,138 +1,112 @@
 import { productService } from '@/lib/api/api';
+import { apiCache } from '@/lib/api/cache';
+import { processProductsResponse } from '@/lib/product-utils';
 import { FilterPreset, InventoryState, Product } from '@/types/inventory.interfaces';
+import { getFilteredAndSortedProducts, getUniqueCategories } from '@/utils/filter-utils';
+import { isValidProductId, prepareMovementData, updateProductList, updateProductStock } from '@/utils/movement-utils';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
 
 export const useInventoryStore = create<InventoryState>()(
   persist(
     (set, get) => ({
-      // Datos iniciales
+      // Estado
       products: [],
       stockMovements: [],
-      // Estado inicial de filtros
-      searchTerm: "",
-      categoryFilter: "all",
-      stockFilter: "all",
-      sortBy: "name",
-      sortDirection: "asc",
-      minPrice: 0,
-      maxPrice: 999999,
+      isLoading: false,
+      error: null,
 
-      // Filtros guardados
+      // Filtros
+      searchTerm: '',
+      categoryFilter: 'all',
+      stockFilter: 'all' as 'all' | 'low' | 'out',
+      minPrice: 0,
+      maxPrice: 1000,
+      sortBy: 'name',
+      sortDirection: 'asc',
       savedFilters: [],
 
-      // Estado inicial para movimientos
-      selectedProduct: null,
+      // Estado de diálogos
       isMovementDialogOpen: false,
-      movementType: "exit",
+      selectedProduct: null,
+      movementType: 'entry',
       movementQuantity: 1,
-      movementReason: "",
+      movementReason: '',
       isCreatingMovement: false,
+      dialogTitle: '',
+      dialogDescription: '',
 
-      // Estado inicial para diálogos
-      dialogTitle: "Movimiento de inventario",
-      dialogDescription: "Complete los campos para registrar el movimiento.",
-
-      // Estado inicial para añadir productos
+      // Estado de añadir producto
       isAddProductDialogOpen: false,
       newProduct: {
-        name: "",
-        category: "",
+        name: '',
+        category: '',
         minimumStock: 0,
         stock: 0,
         entryDate: new Date().toISOString().split('T')[0],
-        exitDate: "",
+        exitDate: '',
         price: 0
       },
 
-      // Obtener estadísticas calculadas
-      getStatistics: () => {
-        const { products } = get();
-        // Verificar que products es un array
-        const productsArray = Array.isArray(products) ? products : [];
-
-        return {
-          totalProducts: productsArray.length,
-          lowStockProducts: productsArray.filter(p => p.stock <= p.minStock).length,
-          totalStock: productsArray.reduce((sum, p) => sum + p.stock, 0),
-          criticalStockPercentage: productsArray.length > 0
-            ? (productsArray.filter(p => p.stock <= p.minStock).length / productsArray.length) * 100
-            : 0
-        };
-      },
-
-      // Obtener categorías únicas
+      // Selectores
       getCategories: () => {
         const { products } = get();
-        // Verificar que products es un array
-        const productsArray = Array.isArray(products) ? products : [];
-        return Array.from(new Set(productsArray.map(p => p.category)));
+        return getUniqueCategories(products);
       },
 
-      // Obtener productos filtrados
       getFilteredProducts: () => {
-        const { products, searchTerm, categoryFilter, stockFilter, sortBy, sortDirection, minPrice, maxPrice } = get();
-
-        // Verificar que products es un array
-        const productsArray = Array.isArray(products) ? products : [];
-
-        if (productsArray.length === 0) {
-          return [];
-        }
+        const {
+          products,
+          searchTerm,
+          categoryFilter,
+          stockFilter,
+          sortBy,
+          sortDirection,
+          minPrice,
+          maxPrice
+        } = get();
 
         try {
-          return productsArray
-            .filter(product => {
-              if (!product) return false;
-
-              const matchesSearch = product.name?.toLowerCase().includes(searchTerm?.toLowerCase() || '') || false;
-              const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
-
-              let matchesStock = stockFilter === "all";
-              if (stockFilter === "low" && typeof product.stock === 'number' && typeof product.minStock === 'number') {
-                matchesStock = product.stock <= product.minStock;
-              } else if (stockFilter === "normal" && typeof product.stock === 'number' && typeof product.minStock === 'number') {
-                matchesStock = product.stock > product.minStock;
-              }
-
-              const price = typeof product.price === 'number' ? product.price : 0;
-              const matchesPrice = price >= minPrice && price <= maxPrice;
-
-              return matchesSearch && matchesCategory && matchesStock && matchesPrice;
-            })
-            .sort((a, b) => {
-              if (!a || !b || !sortBy) return 0;
-
-              // Verificar que las propiedades existen
-              const aHasKey = sortBy in a;
-              const bHasKey = sortBy in b;
-
-              if (!aHasKey || !bHasKey) return 0;
-
-              let aValue: any = a[sortBy as keyof Product];
-              let bValue: any = b[sortBy as keyof Product];
-
-              // Manejar valores nulos o indefinidos
-              if (aValue === undefined || aValue === null) aValue = '';
-              if (bValue === undefined || bValue === null) bValue = '';
-
-              if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-              if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-
-              if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
-              if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
-              return 0;
-            });
+          // Usar la función de utilidad para obtener productos filtrados y ordenados
+          return getFilteredAndSortedProducts(
+            products,
+            {
+              searchTerm,
+              categoryFilter,
+              stockFilter: stockFilter as 'all' | 'low' | 'out',
+              minPrice,
+              maxPrice
+            },
+            { sortBy, sortDirection }
+          );
         } catch (error) {
           console.error("Error al filtrar productos:", error);
           return [];
         }
       },
 
-      // Acciones para actualizar el estado
-      setProducts: (products) => set({ products }),
-      setStockMovements: (stockMovements) => set({ stockMovements }),
+      getStatistics: () => {
+        const { products } = get();
+
+        // Calcular estadísticas
+        const totalProducts = products.length;
+        const lowStockProducts = products.filter(p =>
+          p.stock <= (p.minStock || 0)
+        ).length;
+
+        // Calcular stock total y porcentaje crítico
+        const totalStock = products.reduce((sum, p) => sum + p.stock, 0);
+        const criticalStockPercentage = totalProducts > 0
+          ? (lowStockProducts / totalProducts) * 100
+          : 0;
+
+        return {
+          totalProducts,
+          lowStockProducts,
+          totalStock,
+          criticalStockPercentage
+        };
+      },
 
       // Acciones para filtros
       setSearchTerm: (searchTerm) => set({ searchTerm }),
@@ -142,18 +116,27 @@ export const useInventoryStore = create<InventoryState>()(
       setSortDirection: (sortDirection) => set({ sortDirection }),
       setMinPrice: (minPrice) => set({ minPrice }),
       setMaxPrice: (maxPrice) => set({ maxPrice }),
-      resetPriceFilter: () => set({ minPrice: 0, maxPrice: 999999 }),
       resetAllFilters: () => set({
-        searchTerm: "",
-        categoryFilter: "all",
-        stockFilter: "all",
+        searchTerm: '',
+        categoryFilter: 'all',
+        stockFilter: 'all',
         minPrice: 0,
-        maxPrice: 999999
+        maxPrice: 1000,
+        sortBy: 'name',
+        sortDirection: 'asc'
       }),
+      resetPriceFilter: () => set({
+        minPrice: 0,
+        maxPrice: 1000
+      }),
+
+      // Acciones para productos
+      setProducts: (products) => set({ products }),
+      setStockMovements: (stockMovements) => set({ stockMovements }),
 
       // Acciones para filtros guardados
       saveCurrentFilter: (name) => {
-        const { searchTerm, categoryFilter, stockFilter, sortBy, sortDirection, minPrice, maxPrice, savedFilters } = get();
+        const { savedFilters, searchTerm, categoryFilter, stockFilter, sortBy, sortDirection, minPrice, maxPrice } = get();
 
         const newFilter: FilterPreset = {
           id: Date.now().toString(),
@@ -232,35 +215,43 @@ export const useInventoryStore = create<InventoryState>()(
         }
       }),
 
+      // Acciones para estados de carga y error
+      setIsLoading: (isLoading) => set({ isLoading }),
+      setError: (error) => set({ error }),
+
       // Función para cargar productos
-      fetchProducts: async (userId) => {
+      fetchProducts: async (userId: string) => {
+        const store = get();
+
+        // Actualizar estados
+        set({ isLoading: true, error: null });
+
         try {
-          const response = await productService.getProducts(1, 100, userId);
-          if (response.data && Array.isArray(response.data.products)) {
-            const transformedProducts = response.data.products.map((product: any) => {
-              let productId = product._id || product.id;
+          // Obtener productos del servicio
+          const response = await productService.getProducts(1, 1000, userId);
 
-              if (product._id && !product.id) {
-                productId = product._id;
-              }
+          // Procesar y normalizar la respuesta
+          const products = processProductsResponse(response);
 
-              if (typeof productId !== 'string') {
-                productId = String(productId);
-              }
+          // Actualizar el store con los productos procesados
+          set({ products });
 
-              return {
-                ...product,
-                id: productId,
-              };
-            });
+          return products;
+        } catch (err: any) {
+          console.error("Error al cargar productos:", err);
+          const errorMessage = err.message || 'Error al cargar los productos';
+          set({ error: errorMessage });
 
-            set({ products: transformedProducts });
-          } else {
-            set({ products: [] });
+          // Intentar usar caché si no hay productos
+          const cachedData = apiCache.get<Product[]>('/products', { userId, page: 1, limit: 1000 }, { staleWhileRevalidate: true });
+          if (cachedData && Array.isArray(cachedData) && store.products.length === 0) {
+            const normalizedCache = processProductsResponse(cachedData);
+            set({ products: normalizedCache });
           }
-        } catch (error) {
-          console.error("Error al obtener productos:", error);
-          // Aquí se podría gestionar el error de forma global
+
+          throw err;
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -268,9 +259,10 @@ export const useInventoryStore = create<InventoryState>()(
       openMovementDialog: (product, type) => {
         let correctedProduct = { ...product };
 
-        if (product._id && /^[0-9a-fA-F]{24}$/.test(product._id)) {
+        // Validar el ID del producto
+        if (product._id && isValidProductId(product._id)) {
           correctedProduct.id = product._id;
-        } else if (!/^[0-9a-fA-F]{24}$/.test(product.id)) {
+        } else if (!isValidProductId(product.id)) {
           console.error("ID de producto inválido:", product.id);
           return;
         }
@@ -307,66 +299,47 @@ export const useInventoryStore = create<InventoryState>()(
       }),
 
       // Función para procesar un movimiento
-      handleStockMovement: async (userId, userName) => {
+      handleStockMovement: async (userId: string, userName?: string) => {
         const state = get();
         if (!state.selectedProduct) return;
 
         set({ isCreatingMovement: true });
 
         try {
-          const productId = state.selectedProduct._id || state.selectedProduct.id;
+          // Asegurarnos de que movementType sea solo 'entry' o 'exit'
+          const movementType = state.movementType === 'adjustment'
+            ? 'entry'
+            : state.movementType as 'entry' | 'exit';
 
-          const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(productId);
-
-          if (!isValidObjectId) {
-            throw new Error("ID de producto inválido");
-          }
-
-          if (state.movementType === "exit" && state.movementQuantity > state.selectedProduct.stock) {
-            throw new Error("Stock insuficiente");
-          }
-
-          const movementData = {
-            productId: productId,
-            productName: state.selectedProduct.name,
+          // Usar las utilidades para preparar y validar el movimiento
+          const movementData = prepareMovementData({
+            product: state.selectedProduct,
             quantity: state.movementQuantity,
-            movementType: state.movementType === "entry" ? "in" : "out",
-            type: state.movementType,
-            movementDate: new Date().toISOString(),
-            date: new Date().toISOString(),
-            userId: userId,
-            userName: userName || "Usuario",
-            notes: state.movementReason,
+            movementType: movementType,
             reason: state.movementReason,
-            user: userName || "Usuario"
-          };
+            userId,
+            userName
+          });
 
           // Aquí iría la lógica para enviar el movimiento al backend
           // Ejemplo:
           // const response = await inventoryService.createMovement(movementData);
 
-          // Actualizar estados después del movimiento
+          // Cerrar el diálogo después del movimiento
           set({ isMovementDialogOpen: false });
 
-          // Recargar productos para reflejar el cambio
-          // Este es un enfoque simulado - en producción debería obtenerse del backend
-          set(state => ({
-            products: state.products.map(p => {
-              if (p.id === state.selectedProduct?.id) {
-                return {
-                  ...p,
-                  stock: state.movementType === "entry"
-                    ? p.stock + state.movementQuantity
-                    : p.stock - state.movementQuantity
-                }
-              }
-              return p;
-            }),
-            // También agregamos el movimiento al historial
-            stockMovements: [{
-              ...movementData,
-              id: Date.now().toString()
-            }, ...state.stockMovements]
+          // Actualizar el producto con el nuevo stock
+          const updatedProduct = updateProductStock(
+            state.selectedProduct,
+            movementType,
+            state.movementQuantity
+          );
+
+          // Actualizar la lista de productos y movimientos
+          set((currentState) => ({
+            products: updateProductList(currentState.products, updatedProduct),
+            // Agregar el movimiento al historial
+            stockMovements: [movementData, ...currentState.stockMovements]
           }));
         } catch (error: any) {
           console.error("Error al procesar movimiento:", error);

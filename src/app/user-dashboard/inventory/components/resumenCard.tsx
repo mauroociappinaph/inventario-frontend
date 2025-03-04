@@ -1,16 +1,18 @@
 import { useAuth } from "@/context/auth-context";
 import { Product, StockMovement } from "@/types/inventory.interfaces";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Badge } from "../../../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../../components/ui/card";
 
+interface ResumenCardProps {
+  products: Product[];
+  stockMovements: StockMovement[];
+}
 
-
-export default function ResumenCard() {
+export default function ResumenCard({ products, stockMovements }: ResumenCardProps) {
   const { user } = useAuth();
-  const [products, setProducts] = useState<Product[]>([])
-  const [stockMovements, setStockMovements] = useState<StockMovement[]>([])
-  // Usar useMemo para cálculos costosos
+
+  // Usar useMemo para cálculos eficientes
   const statistics = useMemo(() => ({
     totalProducts: products.length,
     lowStockProducts: products.filter(p => p.stock <= p.minStock).length,
@@ -18,7 +20,8 @@ export default function ResumenCard() {
     criticalStockPercentage: products.length > 0
       ? (products.filter(p => p.stock <= p.minStock).length / products.length) * 100
       : 0
-  }), [products])
+  }), [products]);
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Tarjetas de resumen */}
