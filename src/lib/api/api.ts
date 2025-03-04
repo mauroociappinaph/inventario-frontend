@@ -380,34 +380,56 @@ export const productService = {
     }
 
     try {
+      console.log('Solicitando productos:', { page, limit, userId });
+
+      // Realizar la petición sin caché para obtener siempre datos frescos
       const response = await request('GET', '/products', { page, limit, userId }, {
-        cacheTTL: 2 * 60 * 1000, // 2 minutos
-        staleWhileRevalidate: true
+        useCache: false,
+        retries: 1
       });
 
-      // Verificar el formato de la respuesta
-      if (response && typeof response === 'object') {
-        // Si la respuesta tiene una propiedad 'data' que es un array
-        if ('data' in response && Array.isArray(response.data)) {
-          return response.data;
-        }
-        // Si la respuesta es directamente un array
-        else if (Array.isArray(response)) {
-          return response;
-        }
-        // Si la respuesta tiene productos en otra propiedad
-        else if ('products' in response && Array.isArray(response.products)) {
-          return response.products;
+      console.log('Respuesta del servidor:', response);
+
+      // Normalizar la respuesta
+      let normalizedResponse;
+
+      if (Array.isArray(response)) {
+        normalizedResponse = {
+          products: response,
+          total: response.length,
+          pages: Math.ceil(response.length / limit)
+        };
+      } else if (response && typeof response === 'object') {
+        if (response.data && Array.isArray(response.data.products)) {
+          normalizedResponse = {
+            products: response.data.products,
+            total: response.data.total || response.data.products.length,
+            pages: response.data.pages || Math.ceil(response.data.total / limit)
+          };
+        } else if (response.products && Array.isArray(response.products)) {
+          normalizedResponse = {
+            products: response.products,
+            total: response.total || response.products.length,
+            pages: response.pages || Math.ceil(response.total / limit)
+          };
         }
       }
 
-      // Si llegamos aquí, la respuesta no tiene el formato esperado
-      console.error('Formato de respuesta no válido:', response);
-      return [];
+      if (!normalizedResponse) {
+        console.error('Formato de respuesta no válido:', response);
+        return {
+          products: [],
+          total: 0,
+          pages: 1
+        };
+      }
+
+      console.log('Respuesta normalizada:', normalizedResponse);
+      return normalizedResponse;
+
     } catch (error) {
       console.error('Error al obtener productos:', error);
-      // En caso de error, devolver un array vacío por seguridad
-      return [];
+      throw error;
     }
   },
 
@@ -456,23 +478,16 @@ export const productService = {
 
       const response = await request('POST', '/products', dtoData, { useCache: false });
 
-      // Invalidar la caché de productos al crear uno nuevo
+      // Forzar una actualización inmediata de la caché
       apiCache.invalidateByPattern('/products');
+
+      // Esperar un momento para asegurar que el backend haya procesado la creación
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       console.log('Respuesta exitosa del backend:', response);
       return response;
-    } catch (error: unknown) {
-      console.error('Error al crear producto en el backend:', error);
-
-      // Usamos typeof para verificar el tipo antes de acceder a propiedades
-      if (typeof error === 'object' && error !== null && 'response' in error) {
-        const axiosError = error as { response?: { data?: any } };
-        if (axiosError.response?.data) {
-          console.error('Detalles de la respuesta:', axiosError.response.data);
-        }
-      }
-
-      // Re-lanzar el error para que sea manejado por el siguiente nivel
+    } catch (error) {
+      console.error('Error al crear producto:', error);
       throw error;
     }
   },
@@ -524,13 +539,12 @@ export const inventoryService = {
 
     // Mapeamos el movementType al formato correcto para el backend
     let movementType = movementData.movementType;
-    if (movementType === 'entrada' || movementType === 'in') movementType = 'in';
-    if (movementType === 'salida' || movementType === 'out') movementType = 'out';
-
+    if (movementType === 'entrada') movementType = 'entrada';
+    if (movementType === 'salida') movementType = 'salida';
     // Para compatibilidad interna (el backend podría usar 'type' en algún lugar)
-    let type = 'in';
-    if (movementData.type === 'exit' || movementData.type === 'salida' || movementType === 'out') {
-      type = 'out';
+    let type = 'entrada';
+    if (movementData.type === 'salida') {
+      type = 'salida';
     }
 
     // Creamos una copia del objeto con el ID correcto y tipos compatibles

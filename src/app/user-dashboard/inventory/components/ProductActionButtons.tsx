@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useInventoryHandlers } from "@/hooks/useInventoryHandlers";
 import { cn } from "@/lib/utils";
 import { Product } from "@/types/inventory.interfaces";
-import { ArrowDownUp, PackageMinus, PackagePlus } from "lucide-react";
+import { PackageMinus, PackagePlus } from "lucide-react";
 
 interface ProductActionButtonsProps {
   product: Product;
@@ -11,7 +11,6 @@ interface ProductActionButtonsProps {
   showLabels?: boolean;
   variant?: ButtonProps["variant"];
   size?: ButtonProps["size"];
-  allowEntries?: boolean;
 }
 
 export default function ProductActionButtons({
@@ -19,8 +18,7 @@ export default function ProductActionButtons({
   className,
   showLabels = false,
   variant = "outline",
-  size = "sm",
-  allowEntries = false
+  size = "sm"
 }: ProductActionButtonsProps) {
   // Utilizamos el hook de manejadores de inventario
   const { handleOpenMovementDialog } = useInventoryHandlers();
@@ -28,51 +26,38 @@ export default function ProductActionButtons({
   return (
     <div className={cn("flex gap-2", className)}>
       <TooltipProvider>
-        {allowEntries && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={variant}
-                size={size}
-                onClick={() => handleOpenMovementDialog(product, "entry")}
-                className="gap-1"
-              >
-                <PackagePlus size={16} />
-                {showLabels && "Entrada"}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Registrar entrada de stock</TooltipContent>
-          </Tooltip>
-        )}
-
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant={variant}
+              variant="default"
               size={size}
-              onClick={() => handleOpenMovementDialog(product, "exit")}
-              className="gap-1"
+              onClick={() => handleOpenMovementDialog(product, "entrada")}
+              className="gap-1 bg-green-600 hover:bg-green-700 text-white"
             >
-              <PackageMinus size={16} />
-              {showLabels && "Salida"}
+              <PackagePlus size={16} className="animate-pulse" />
+              {showLabels && "Entrada"}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Registrar salida de stock</TooltipContent>
+          <TooltipContent>
+            <p>Agregar productos al inventario</p>
+          </TooltipContent>
         </Tooltip>
 
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant={variant}
+              variant="destructive"
               size={size}
-              onClick={() => handleOpenMovementDialog(product, "adjustment")}
+              onClick={() => handleOpenMovementDialog(product, "salida")}
               className="gap-1"
             >
-              <ArrowDownUp size={16} />
-              {showLabels && "Ajuste"}
+              <PackageMinus size={16} className="animate-pulse" />
+              {showLabels && "Salida"}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Realizar ajuste de inventario</TooltipContent>
+          <TooltipContent>
+            <p>Retirar productos del inventario</p>
+          </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     </div>

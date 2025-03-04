@@ -9,13 +9,22 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/context/auth-context"
 import { useInventory } from "@/hooks/useInventory"
-import { AlertTriangle, BarChart2, CircleDollarSign, Clock, Package, ShoppingCart, TrendingDown, TrendingUp } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useInventoryStore } from "@/store/useInventoryStore"
+import { AlertTriangle, BarChart2, CircleDollarSign, Package, TrendingDown, TrendingUp } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 
 export default function UserDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useAuth()
   const { inventoryStats, inventoryStatsLoading } = useInventory()
+  const { stockMovements } = useInventoryStore()
+
+  // Ordenar movimientos por fecha (más recientes primero)
+  const recentMovements = useMemo(() => {
+    return [...(stockMovements || [])]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 3); // Mostrar solo los 3 más recientes
+  }, [stockMovements]);
 
   // Simular carga de datos
   useEffect(() => {
@@ -356,55 +365,52 @@ export default function UserDashboard() {
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-12 w-full" />
               </div>
+            ) : recentMovements.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay movimientos registrados.
+              </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                      <Package className="h-5 w-5 text-green-600 dark:text-green-400" />
+                {recentMovements.map((movement, index) => (
+                  <div key={movement.id || index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        movement.type === "entrada"
+                          ? "bg-green-100 dark:bg-green-900"
+                          : "bg-red-100 dark:bg-red-900"
+                      }`}>
+                        <Package className={`h-5 w-5 ${
+                          movement.type === "entrada"
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-red-600 dark:text-red-400"
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="font-medium">{movement.type === "entrada" ? "Entrada" : "Salida"} de producto</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {movement.quantity} unidades de {movement.productName}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Entrada de producto</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">10 unidades de Producto X</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <Badge variant="outline" className="bg-green-50 dark:bg-green-900/30">Entrada</Badge>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">Hoy, 14:30</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-                      <ShoppingCart className="h-5 w-5 text-red-600 dark:text-red-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Salida de producto</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">5 unidades de Producto Y</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <Badge variant="outline" className="bg-red-50 dark:bg-red-900/30">Salida</Badge>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">Ayer, 09:15</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                      <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Ajuste de inventario</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">3 unidades de Producto Z</p>
+                    <div className="flex flex-col items-end">
+                      <Badge
+                        variant="outline"
+                        className={movement.type === "entrada"
+                          ? "bg-green-50 dark:bg-green-900/30"
+                          : "bg-red-50 dark:bg-red-900/30"
+                        }
+                      >
+                        {movement.type === "entrada" ? "Entrada" : "Salida"}
+                      </Badge>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {new Date(movement.date).toLocaleDateString('es-ES', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end">
-                    <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30">Ajuste</Badge>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">Hace 2 días</span>
-                  </div>
-                </div>
+                ))}
               </div>
             )}
           </CardContent>

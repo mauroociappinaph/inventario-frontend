@@ -1,17 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { Search, Filter, ArrowUpDown, Tag, CheckCircle, XCircle, Loader2, Eye, Plus } from "lucide-react"
-import { productService, ProductStatus, convertStatusToFrontend, CreateProductDto, ErrorResponse } from "@/lib/api/api"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useAuth } from "@/context/auth-context"
+import { convertStatusToFrontend, CreateProductDto, productService, ProductStatus } from "@/lib/api/api"
+import { ArrowUpDown, CheckCircle, Eye, Filter, Loader2, Plus, Search, Tag, XCircle } from "lucide-react"
+import { useEffect, useState } from "react"
 
 // Tipo para los productos
 interface Product {
@@ -68,10 +68,13 @@ export default function UserProductsPage() {
   })
 
   useEffect(() => {
-    if (user?.id) {
-      fetchProducts()
+    const loadProducts = async () => {
+      if (user?.id) {
+        await fetchProducts()
+      }
     }
-  }, [currentPage, itemsPerPage, user])
+    loadProducts()
+  }, [currentPage, itemsPerPage, user?.id])
 
   // Función para cargar productos desde la API
   const fetchProducts = async () => {
@@ -87,18 +90,20 @@ export default function UserProductsPage() {
         return
       }
 
-      const response = await productService.getProducts(currentPage, itemsPerPage, user.id) as unknown as ApiResponse
+      console.log('Obteniendo productos para usuario:', user.id)
+      const response = await productService.getProducts(currentPage, itemsPerPage, user.id)
+      console.log('Respuesta de productos:', response)
 
-      if (response.data && Array.isArray(response.data.products)) {
-        // Se asigna "active" por defecto si convertStatusToFrontend retorna un valor falsy
-        const formattedProducts = response.data.products.map((product: Product) => ({
+      if (response && response.products) {
+        const formattedProducts = response.products.map((product: Product) => ({
           ...product,
           status: convertStatusToFrontend(product.status as string) || "active"
         }))
+        console.log('Productos formateados:', formattedProducts)
         setProducts(formattedProducts)
-        const total = response.data.total || response.data.products.length
-        setTotalPages(Math.ceil(total / itemsPerPage))
+        setTotalPages(response.pages || Math.ceil(response.total / itemsPerPage))
       } else {
+        console.log('No se encontraron productos en la respuesta')
         setProducts([])
         setTotalPages(1)
       }
@@ -217,8 +222,10 @@ export default function UserProductsPage() {
       const response = await productService.createProduct(productToAdd)
       console.log("Respuesta del servidor:", response)
 
-      await fetchProducts()
+      // Cerrar el diálogo antes de recargar los productos
+      setIsAddProductDialogOpen(false)
 
+      // Limpiar el formulario
       setNewProduct({
         name: "",
         category: "",
@@ -226,45 +233,22 @@ export default function UserProductsPage() {
         stock: 0
       })
 
-      setIsAddProductDialogOpen(false)
-
+      // Mostrar mensaje de éxito
       toast({
         title: "Producto añadido",
         description: `Se ha añadido "${productToAdd.name}" al catálogo de productos.`
       })
-    } catch (error: unknown) {
+
+      // Recargar la lista de productos después de un breve retraso
+      setTimeout(async () => {
+        await fetchProducts()
+      }, 500)
+
+    } catch (error: any) {
       console.error("Error al crear producto:", error)
-      let errorMessage = "No se pudo crear el producto. Intente nuevamente."
-
-      const typedError = error as ErrorResponse
-      if (typedError.data && typedError.data.response) {
-        errorMessage = typedError.data.response.data?.message || errorMessage
-        if (typedError.data.response.data?.errors) {
-          const validationErrors = typedError.data.response.data.errors
-          if (Object.keys(validationErrors).length > 0) {
-            errorMessage = Object.entries(validationErrors)
-              .map(([campo, mensaje]) => `${campo}: ${mensaje}`)
-              .join(', ')
-          }
-        }
-      } else if (typedError.data?.errors) {
-        const validationErrors = typedError.data.errors
-        if (Object.keys(validationErrors).length > 0) {
-          errorMessage = Object.entries(validationErrors)
-            .map(([campo, mensaje]) => `${campo}: ${mensaje}`)
-            .join(', ')
-        } else {
-          errorMessage = typedError.message || errorMessage
-        }
-      } else if (typedError.message) {
-        errorMessage = typedError.message
-      } else if (typedError.status) {
-        errorMessage = `Error ${typedError.status}: ${typedError.message || 'Error desconocido'}`
-      }
-
       toast({
         title: "Error al crear producto",
-        description: errorMessage,
+        description: error.message || "No se pudo crear el producto. Por favor, intente nuevamente.",
         variant: "destructive"
       })
     }
@@ -307,7 +291,7 @@ export default function UserProductsPage() {
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  <SelectItem key="all" value="all">Todas las categorías</SelectItem>
                   {categories.map((category) => (
                     <SelectItem key={category} value={category}>
                       {category}

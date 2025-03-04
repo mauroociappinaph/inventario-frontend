@@ -9,18 +9,36 @@ interface ResumenCardProps {
   stockMovements: StockMovement[];
 }
 
-export default function ResumenCard({ products, stockMovements }: ResumenCardProps) {
+export default function ResumenCard({ products = [], stockMovements = [] }: ResumenCardProps) {
   const { user } = useAuth();
 
   // Usar useMemo para cálculos eficientes
-  const statistics = useMemo(() => ({
-    totalProducts: products.length,
-    lowStockProducts: products.filter(p => p.stock <= p.minStock).length,
-    totalStock: products.reduce((sum, p) => sum + p.stock, 0),
-    criticalStockPercentage: products.length > 0
-      ? (products.filter(p => p.stock <= p.minStock).length / products.length) * 100
-      : 0
-  }), [products]);
+  const statistics = useMemo(() => {
+    // Asegurarnos de que products y stockMovements son arrays
+    const safeProducts = Array.isArray(products) ? products : [];
+    const safeMovements = Array.isArray(stockMovements) ? stockMovements : [];
+
+    // Filtrar movimientos de los últimos 30 días
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentMovements = safeMovements.filter(m => new Date(m.date) >= thirtyDaysAgo);
+    const userMovements = recentMovements.filter(m => m.user === user?.name);
+
+    return {
+      totalProducts: safeProducts.length,
+      lowStockProducts: safeProducts.filter(p => p.stock <= p.minStock).length,
+      totalStock: safeProducts.reduce((sum, p) => sum + p.stock, 0),
+      criticalStockPercentage: safeProducts.length > 0
+        ? (safeProducts.filter(p => p.stock <= p.minStock).length / safeProducts.length) * 100
+        : 0,
+      // Estadísticas de movimientos
+      totalMovements: recentMovements.length,
+      userMovements: userMovements.length,
+      entries: recentMovements.filter(m => m.type === "entrada").length,
+      exits: recentMovements.filter(m => m.type === "salida").length
+    };
+  }, [products, stockMovements, user?.name]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -77,15 +95,22 @@ export default function ResumenCard({ products, stockMovements }: ResumenCardPro
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Mis Movimientos</CardTitle>
+          <CardTitle className="text-sm font-medium">Movimientos Recientes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
-            {stockMovements.filter(m => m.user === user?.name).length}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <div className="text-2xl font-bold">{statistics.totalMovements}</div>
+              <div className="text-sm text-muted-foreground">
+                <span className="text-green-600">{statistics.entries} entradas</span>
+                {" / "}
+                <span className="text-red-600">{statistics.exits} salidas</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {statistics.userMovements} movimientos tuyos en los últimos 30 días
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Últimos 30 días
-          </p>
         </CardContent>
       </Card>
     </div>

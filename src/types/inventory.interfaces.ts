@@ -11,6 +11,7 @@ export interface Product {
   entryDate?: string
   exitDate?: string
   lastStockUpdate: string
+  userId?: string // ID del usuario propietario del producto (opcional)
 
 }
 
@@ -18,7 +19,7 @@ export interface StockMovement {
   id: string
   productId: string
   productName: string
-  type: "entry" | "exit" | "adjustment"
+  type: "entrada" | "salida"
   quantity: number
   reason: string
   date: string
@@ -61,7 +62,7 @@ export interface InventoryState {
   // Movimientos
   selectedProduct: Product | null;
   isMovementDialogOpen: boolean;
-  movementType: "entry" | "exit" | "adjustment";
+  movementType: "entrada" | "salida"
   movementQuantity: number;
   movementReason: string;
   isCreatingMovement: boolean;
@@ -118,7 +119,7 @@ export interface InventoryState {
   // Acciones para movimientos
   setSelectedProduct: (product: Product | null) => void;
   setIsMovementDialogOpen: (isOpen: boolean) => void;
-  setMovementType: (type: "entry" | "exit" | "adjustment") => void;
+  setMovementType: (type: "entrada" | "salida") => void;
   setMovementQuantity: (quantity: number) => void;
   setMovementReason: (reason: string) => void;
   setIsCreatingMovement: (isCreating: boolean) => void;
@@ -138,7 +139,8 @@ export interface InventoryState {
 
   // Funciones principales
   fetchProducts: (userId: string) => Promise<Product[]>;
-  openMovementDialog: (product: Product, type: "entry" | "exit") => void;
+  fetchStockMovements: (userId: string) => Promise<StockMovement[]>;
+  openMovementDialog: (product: Product, type: "entrada" | "salida") => void;
   handleStockMovement: (userId: string, userName: string) => Promise<void>;
   resetMovementForm: () => void;
 }

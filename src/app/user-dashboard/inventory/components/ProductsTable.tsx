@@ -159,7 +159,6 @@ export default function ProductsTable({
                           <div className="flex justify-end gap-2">
                             <ProductActionButtons
                               product={product}
-                              allowEntries={isAdmin}
                             />
                           </div>
                         </td>

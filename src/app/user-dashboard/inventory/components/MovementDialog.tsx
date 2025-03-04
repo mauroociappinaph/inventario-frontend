@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/context/auth-context";
 import { useInventoryHandlers } from "@/hooks/useInventoryHandlers";
 import { Product } from "@/types/inventory.interfaces";
 import { AlertTriangle, DollarSign, Package } from "lucide-react";
@@ -22,7 +22,7 @@ interface MovementDialogProps {
   product: Product | null;
   dialogTitle: string;
   dialogDescription: string;
-  movementType: "entry" | "exit" | "adjustment";
+  movementType: "entrada" | "salida";
   movementQuantity: number;
   movementReason: string;
   setMovementQuantity: (quantity: number) => void;
@@ -41,9 +41,32 @@ export default function MovementDialog({
   movementReason,
   setMovementQuantity,
   setMovementReason,
+  isCreatingMovement
 }: MovementDialogProps) {
   const { toast } = useToast();
-  const { handleProcessMovement } = useInventoryHandlers();
+  const { user } = useAuth();
+  const { handleStockMovement } = useInventoryHandlers();
+
+  const handleSubmit = async () => {
+    try {
+      if (!product || !user?.id) return;
+
+      await handleStockMovement(user.id, user.name);
+      onOpenChange(false);
+
+      toast({
+        title: "Movimiento registrado",
+        description: `Se ha ${movementType === "entrada" ? "agregado" : "registrado la salida de"} ${movementQuantity} unidades ${movementType === "entrada" ? "al" : "del"} producto ${product.name}`,
+        variant: "default",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error al procesar el movimiento",
+        description: error.message || "Ha ocurrido un error al procesar el movimiento",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,14 +117,14 @@ export default function MovementDialog({
                 id="quantity"
                 type="number"
                 min={1}
-                max={movementType === "exit" ? product?.stock || 1 : 1000}
+                max={movementType === "salida" ? product?.stock || 1 : 1000}
                 value={movementQuantity}
                 onChange={(e) => {
                   const value = parseInt(e.target.value);
                   // Validación en tiempo real
                   if (value <= 0) {
                     setMovementQuantity(1);
-                  } else if (movementType === "exit" && product && value > product.stock) {
+                  } else if (movementType === "salida" && product && value > product.stock) {
                     // Limitar al máximo disponible solo para salidas
                     setMovementQuantity(product.stock);
                     toast({
@@ -115,25 +138,9 @@ export default function MovementDialog({
                 }}
               />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="reason">Motivo:</Label>
-              <Textarea
-                id="reason"
-                placeholder={
-                  movementType === "entry"
-                    ? "Ej: Compra de nuevas unidades, devolución de cliente..."
-                    : "Ej: Venta, pérdida, producto dañado..."
-                }
-                value={movementReason}
-                onChange={(e) => setMovementReason(e.target.value)}
-                className="resize-none"
-                rows={3}
-              />
-            </div>
           </div>
 
-          {movementType === "exit" && product && movementQuantity > product.stock && (
+          {movementType === "salida" && product && movementQuantity > product.stock && (
             <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm flex items-center gap-2">
               <AlertTriangle size={16} />
               No hay suficiente stock para esta operación.
@@ -145,20 +152,12 @@ export default function MovementDialog({
             Cancelar
           </Button>
           <Button
-            onClick={handleProcessMovement}
-            className={`${
-              movementType === "entry"
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-blue-600 hover:bg-blue-700"
-            }`}
-            disabled={
-              !product ||
-              movementQuantity <= 0 ||
-              !movementReason.trim() ||
-              (movementType === "exit" && product.stock < movementQuantity)
-            }
+            onClick={handleSubmit}
+            variant={movementType === "entrada" ? "default" : "destructive"}
+            className={movementType === "entrada" ? "bg-green-600 hover:bg-green-700 text-white" : undefined}
+            disabled={!product || movementQuantity <= 0 || (movementType === "salida" && product.stock < movementQuantity) || isCreatingMovement}
           >
-            {movementType === "entry" ? "Registrar Entrada" : "Registrar Salida"}
+            {isCreatingMovement ? "Procesando..." : movementType === "entrada" ? "Registrar Entrada" : "Registrar Salida"}
           </Button>
         </DialogFooter>
       </DialogContent>

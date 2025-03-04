@@ -1,4 +1,5 @@
 import { useToast } from '@/components/ui/use-toast';
+import { productService } from '@/lib/api/api';
 import { useSyncUtils } from '@/lib/api/sync-utils';
 import { useInventoryStore } from '@/store/useInventoryStore';
 import { Product } from '@/types/inventory.interfaces';
@@ -36,6 +37,8 @@ export const useInventoryHandlers = () => {
     try {
       // Usar el fetchProducts del store
       await store.fetchProducts(userId);
+      // Cargar también los movimientos
+      await store.fetchStockMovements(userId);
     } catch (err: any) {
       // El error ya está manejado en el store, simplemente mostramos el toast
       showErrorToast("Error", err.message || "No se pudieron cargar los productos");
@@ -64,32 +67,28 @@ export const useInventoryHandlers = () => {
     try {
       store.setIsLoading(true);
 
-      // Aquí iría la lógica para enviar al backend
-      // Ejemplo:
-      // const response = await productService.createProduct({
-      //    ...store.newProduct,
-      //    userId
-      // });
-
-      // Simular creación
-      const newProductId = Date.now().toString();
-      const createdProduct = {
-        ...store.newProduct,
-        id: newProductId,
-        _id: newProductId,
-        lastUpdated: new Date().toISOString(),
-        lastStockUpdate: new Date().toISOString(),
-        minStock: store.newProduct.minimumStock || 0
+      // Crear el producto usando el servicio de productos
+      const productData = {
+        name: store.newProduct.name,
+        category: store.newProduct.category,
+        price: store.newProduct.price || 0,
+        stock: store.newProduct.stock || 0,
+        minStock: store.newProduct.minimumStock || 0,
+        userId: userId,
+        entryDate: new Date().toISOString()
       };
 
+      const response = await productService.createProduct(productData);
+      console.log("Producto creado:", response);
+
       // Actualizar estado
-      store.setProducts([...store.products, createdProduct]);
+      await store.fetchProducts(userId);
       store.setIsAddProductDialogOpen(false);
       store.resetNewProductForm();
 
       showSuccessToast(
         "Producto creado",
-        `El producto ${createdProduct.name} ha sido creado con éxito`
+        `El producto ${productData.name} ha sido creado con éxito`
       );
     } catch (err: any) {
       showErrorToast(
@@ -105,52 +104,66 @@ export const useInventoryHandlers = () => {
   /**
    * Maneja la apertura del diálogo de movimientos
    */
-  const handleOpenMovementDialog = (product: any, type: "entry" | "exit") => {
+  const handleOpenMovementDialog = (product: any, type: "entrada" | "salida") => {
     if (!product) {
       showErrorToast("Error", "Producto no seleccionado");
       return;
     }
 
-    store.openMovementDialog(product, type);
+    // Asegurarnos de que el tipo sea válido
+    const movementType = type === "entrada" ? "entrada" : "salida";
+    const title = movementType === "entrada" ? "Registrar entrada de productos" : "Registrar salida de productos";
+    const description = movementType === "entrada"
+      ? "Ingrese la cantidad de productos que entrarán al inventario."
+      : "Ingrese la cantidad de productos que saldrán del inventario.";
+
+    store.openMovementDialog(product, movementType);
+    store.setDialogTitle(title);
+    store.setDialogDescription(description);
   };
 
   /**
    * Maneja la creación de un movimiento
    */
-  const handleStockMovement = async (userId: string, userName?: string) => {
-    if (!store.selectedProduct) {
-      showErrorToast("Error", "No hay producto seleccionado");
-      return;
+const handleStockMovement = async (userId: string, userName?: string) => {
+  console.log("handleStockMovement called with:", { userId, userName, selectedProduct: store.selectedProduct });
+
+  if (!store.selectedProduct) {
+    console.error("Error: No product selected");
+    showErrorToast("Error", "No hay producto seleccionado");
+    return;
+  }
+
+  setIsProcessingMovement(true);
+
+  try {
+    console.log("Movement details:", {
+      type: store.movementType,
+      quantity: store.movementQuantity,
+      stock: store.selectedProduct.stock
+    });
+
+    if (store.movementType === "salida" && store.movementQuantity > store.selectedProduct.stock) {
+      throw new Error(`Stock insuficiente. Disponible: ${store.selectedProduct.stock} unidades`);
     }
 
-    setIsProcessingMovement(true);
+console.log("Enviando datos a handleStockMovement:", { userId, userName, selectedProduct: store.selectedProduct, movementType: store.movementType, movementQuantity: store.movementQuantity });
+await store.handleStockMovement(userId, userName || "Usuario");
 
-    try {
-      // Validar que haya stock suficiente para salidas
-      if (store.movementType === "exit" && store.movementQuantity > store.selectedProduct.stock) {
-        throw new Error(`Stock insuficiente. Disponible: ${store.selectedProduct.stock} unidades`);
-      }
+    showSuccessToast(
+      "Movimiento registrado",
+      `${store.movementType === "entrada" ? "Entrada" : "Salida"} de ${store.movementQuantity} unidades registrada con éxito`
+    );
 
-      // Usar la función del store para procesar el movimiento
-      await store.handleStockMovement(userId, userName || "Usuario");
-
-      showSuccessToast(
-        "Movimiento registrado",
-        `${store.movementType === "entry" ? "Entrada" : "Salida"} de ${store.movementQuantity} unidades registrada con éxito`
-      );
-
-      // Cerrar el diálogo y resetear el formulario
-      store.resetMovementForm();
-    } catch (err: any) {
-      console.error("Error al procesar movimiento:", err);
-      showErrorToast(
-        "Error al procesar movimiento",
-        err.message || "Ha ocurrido un error al procesar el movimiento"
-      );
-    } finally {
-      setIsProcessingMovement(false);
-    }
-  };
+    store.resetMovementForm();
+  } catch (err: any) {
+    console.error("Error processing stock movement:", err);
+    showErrorToast("Error al procesar movimiento", err.message || "Ha ocurrido un error al procesar el movimiento");
+  } finally {
+    setIsProcessingMovement(false);
+    console.log("handleStockMovement completed");
+  }
+};
 
   /**
    * Maneja la sincronización de datos
@@ -183,7 +196,6 @@ export const useInventoryHandlers = () => {
   const handleOpenAddProductDialog = () => {
     store.resetNewProductForm();
     store.setIsAddProductDialogOpen(true);
-    setIsAddProductFormOpen(true);
   };
 
   /**
@@ -253,6 +265,9 @@ export const useInventoryHandlers = () => {
       variant: "default"
     });
   };
+
+
+
 
   // Retornar las funciones y estados necesarios
   return {

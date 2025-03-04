@@ -26,6 +26,15 @@ const nextConfig = {
     removeConsole: process.env.NODE_ENV === "production",
     styledComponents: true,
   },
+  // Configuración del proxy de la API
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:3001/:path*'
+      }
+    ]
+  },
   // Añadir configuración de imágenes
   images: {
     remotePatterns: [

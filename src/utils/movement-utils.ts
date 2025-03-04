@@ -48,7 +48,7 @@ export function prepareMovementData({
 }: {
   product: Product;
   quantity: number;
-  movementType: 'entry' | 'exit';
+  movementType: 'entrada' | 'salida';
   reason: string;
   userId: string;
   userName?: string;
@@ -59,7 +59,7 @@ export function prepareMovementData({
     throw new Error("ID de producto inválido");
   }
 
-  if (movementType === "exit") {
+  if (movementType === "salida") {
     const validation = validateStockAvailability(product, quantity);
     if (!validation.isValid) {
       throw new Error(validation.message || "Stock insuficiente");
@@ -87,12 +87,12 @@ export function prepareMovementData({
  */
 export function updateProductStock(
   product: Product,
-  movementType: 'entry' | 'exit',
+  movementType: 'entrada' | 'salida',
   quantity: number
 ): Product {
   if (!product) return product;
 
-  const newStock = movementType === 'entry'
+  const newStock = movementType === 'entrada'
     ? product.stock + quantity
     : product.stock - quantity;
 

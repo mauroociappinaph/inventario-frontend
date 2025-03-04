@@ -46,16 +46,16 @@ export default function MovementsTable({
                         {formatDate(movement.date)}
                       </td>
                       <td className="py-3 px-4">
-                        <Badge variant={movement.type === "entry" ? "success" : movement.type === "exit" ? "destructive" : "outline"} className="flex items-center gap-1 w-fit">
-                          {movement.type === "entry" && <PackagePlus size={14} />}
-                          {movement.type === "exit" && <PackageMinus size={14} />}
-                          {movement.type === "entry" ? "Entrada" : movement.type === "exit" ? "Salida" : "Ajuste"}
+                        <Badge variant={movement.type === "entrada" ? "success" : movement.type === "salida" ? "destructive" : "outline"} className="flex items-center gap-1 w-fit">
+                          {movement.type === "entrada" && <PackagePlus size={14} />}
+                          {movement.type === "salida" && <PackageMinus size={14} />}
+                          {movement.type === "entrada" ? "Entrada" : movement.type === "salida" ? "Salida" : "Ajuste"}
                         </Badge>
                       </td>
                       <td className="py-3 px-4 font-medium">{movement.productName}</td>
                       <td className="py-3 px-4 text-right font-mono">
-                        <span className={movement.type === "entry" ? "text-green-600" : movement.type === "exit" ? "text-red-600" : "text-blue-600"}>
-                          {movement.type === "entry" ? "+" : movement.type === "exit" ? "-" : ""}
+                        <span className={movement.type === "entrada" ? "text-green-600" : movement.type === "salida" ? "text-red-600" : "text-blue-600"}>
+                          {movement.type === "entrada" ? "+" : movement.type === "salida" ? "-" : ""}
                           {movement.quantity}
                         </span>
                       </td>

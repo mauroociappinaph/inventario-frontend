@@ -1,4 +1,4 @@
-import { productService } from '@/lib/api/api';
+import { inventoryService, productService } from '@/lib/api/api';
 import { apiCache } from '@/lib/api/cache';
 import { processProductsResponse } from '@/lib/product-utils';
 import { FilterPreset, InventoryState, Product } from '@/types/inventory.interfaces';
@@ -29,7 +29,7 @@ export const useInventoryStore = create<InventoryState>()(
       // Estado de diálogos
       isMovementDialogOpen: false,
       selectedProduct: null,
-      movementType: 'entry',
+      movementType: 'entrada' as 'entrada' | 'salida',
       movementQuantity: 1,
       movementReason: '',
       isCreatingMovement: false,
@@ -255,6 +255,36 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
 
+      // Función para cargar movimientos
+      fetchStockMovements: async (userId: string) => {
+        const store = get();
+        set({ isLoading: true, error: null });
+
+        try {
+          // Obtener movimientos del servicio
+          const response = await inventoryService.getInventoryMovements(userId);
+
+          // Actualizar el store con los movimientos
+          set({ stockMovements: response });
+
+          return response;
+        } catch (err: any) {
+          console.error("Error al cargar movimientos:", err);
+          const errorMessage = err.message || 'Error al cargar los movimientos';
+          set({ error: errorMessage });
+
+          // Intentar usar caché si no hay movimientos
+          const cachedData = apiCache.get('/movements', { userId }, { staleWhileRevalidate: true });
+          if (cachedData && Array.isArray(cachedData) && store.stockMovements.length === 0) {
+            set({ stockMovements: cachedData });
+          }
+
+          throw err;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
       // Función para abrir el diálogo de movimientos
       openMovementDialog: (product, type) => {
         let correctedProduct = { ...product };
@@ -268,16 +298,13 @@ export const useInventoryStore = create<InventoryState>()(
         }
 
         // Actualizamos también el título y descripción del diálogo
-        let dialogTitle = "Movimiento de inventario";
-        let dialogDescription = "Complete los campos para registrar el movimiento.";
+        let dialogTitle = type === "entrada"
+          ? "Registrar entrada de productos"
+          : "Registrar salida de productos";
 
-        if (type === "entry") {
-          dialogTitle = "Agregar productos al inventario";
-          dialogDescription = "Complete los campos para registrar la entrada de productos.";
-        } else {
-          dialogTitle = "Registrar consumo de inventario";
-          dialogDescription = "Complete los campos para registrar el consumo de productos.";
-        }
+        let dialogDescription = type === "entrada"
+          ? "Ingrese la cantidad de productos que entrarán al inventario."
+          : "Ingrese la cantidad de productos que saldrán del inventario.";
 
         set({
           selectedProduct: correctedProduct,
@@ -301,59 +328,92 @@ export const useInventoryStore = create<InventoryState>()(
       // Función para procesar un movimiento
       handleStockMovement: async (userId: string, userName?: string) => {
         const state = get();
-        if (!state.selectedProduct) return;
+        console.log("handleStockMovement ejecutado con:", { userId, userName, selectedProduct: state.selectedProduct });
+
+        if (!state.selectedProduct) {
+            console.warn("No hay producto seleccionado para movimiento.");
+            return;
+        }
 
         set({ isCreatingMovement: true });
+        console.log("Iniciando movimiento de stock...");
 
         try {
-          // Asegurarnos de que movementType sea solo 'entry' o 'exit'
-          const movementType = state.movementType === 'adjustment'
-            ? 'entry'
-            : state.movementType as 'entry' | 'exit';
+            const movementType = state.movementType === 'entrada' ? 'entrada' : 'salida';
 
-          // Usar las utilidades para preparar y validar el movimiento
-          const movementData = prepareMovementData({
-            product: state.selectedProduct,
-            quantity: state.movementQuantity,
-            movementType: movementType,
-            reason: state.movementReason,
-            userId,
-            userName
-          });
+            console.log("Tipo de movimiento determinado:", movementType);
 
-          // Aquí iría la lógica para enviar el movimiento al backend
-          // Ejemplo:
-          // const response = await inventoryService.createMovement(movementData);
+            // Usar las utilidades para preparar y validar el movimiento
+            const movementData = prepareMovementData({
+                product: state.selectedProduct,
+                quantity: state.movementQuantity,
+                movementType: movementType,
+                reason: state.movementReason,
+                userId,
+                userName
+            });
 
-          // Cerrar el diálogo después del movimiento
-          set({ isMovementDialogOpen: false });
+            console.log("Datos del movimiento preparados:", movementData);
 
-          // Actualizar el producto con el nuevo stock
-          const updatedProduct = updateProductStock(
-            state.selectedProduct,
-            movementType,
-            state.movementQuantity
-          );
+            // Usar el inventoryService para crear el movimiento
+            const response = await inventoryService.createInventoryMovement({
+                productId: movementData.productId,
+                quantity: movementData.quantity,
+                movementType: movementData.type,
+                reason: movementData.reason,
+                userId: userId,
+                date: new Date().toISOString(),
+                resultingBalance: state.selectedProduct.stock + (movementType === 'entrada' ? movementData.quantity : -movementData.quantity)
+            });
 
-          // Actualizar la lista de productos y movimientos
-          set((currentState) => ({
-            products: updateProductList(currentState.products, updatedProduct),
-            // Agregar el movimiento al historial
-            stockMovements: [movementData, ...currentState.stockMovements]
-          }));
+            console.log("Respuesta del backend:", response);
+
+            // Actualizar el producto con el nuevo stock
+            const updatedProduct = updateProductStock(
+                state.selectedProduct,
+                movementType,
+                state.movementQuantity
+            );
+
+            console.log("Producto actualizado con nuevo stock:", updatedProduct);
+
+            // Actualizar la lista de productos y movimientos
+            set((currentState) => {
+                console.log("Actualizando productos y stockMovements en el estado...");
+                const currentMovements = Array.isArray(currentState.stockMovements) ? currentState.stockMovements : [];
+                return {
+                    products: updateProductList(currentState.products, updatedProduct),
+                    stockMovements: [{ ...movementData, ...response }, ...currentMovements]
+                };
+            });
+
+            // Recargar los productos para asegurar sincronización con el backend
+            await get().fetchProducts(userId);
+
+            console.log("Movimiento procesado exitosamente.");
+            return response;
         } catch (error: any) {
-          console.error("Error al procesar movimiento:", error);
-          throw error;
+            console.error("Error al procesar movimiento:", error);
+            throw error;
         } finally {
-          set({ isCreatingMovement: false });
+            set({ isCreatingMovement: false });
+            console.log("Finalizando handleStockMovement.");
         }
-      },
+    },
     }),
     {
       name: 'inventory-storage',
       partialize: (state) => ({
         savedFilters: state.savedFilters,
-        // Solo persistimos los filtros guardados, no los datos de productos
+        products: state.products,
+        stockMovements: state.stockMovements,
+        selectedProduct: state.selectedProduct,
+        movementType: state.movementType,
+        movementQuantity: state.movementQuantity,
+        movementReason: state.movementReason,
+        isMovementDialogOpen: state.isMovementDialogOpen,
+        dialogTitle: state.dialogTitle,
+        dialogDescription: state.dialogDescription
       }),
     }
   )

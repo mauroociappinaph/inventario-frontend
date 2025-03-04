@@ -1,23 +1,23 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useTheme } from "next-themes"
-import { useInventory } from "@/hooks/useInventory"
-import { Bar, Line } from "react-chartjs-2"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useInventory } from "@/hooks/useInventory"
 import { cn } from "@/lib/utils"
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
   BarElement,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
   Legend,
-  Filler
+  LinearScale,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip
 } from 'chart.js'
+import { useTheme } from "next-themes"
+import { useEffect, useState } from "react"
+import { Bar, Line } from "react-chartjs-2"
 
 // Registramos los componentes de Chart.js que vamos a utilizar
 ChartJS.register(
@@ -62,23 +62,19 @@ export function InventoryChart() {
         const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
         const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
 
-        // Simulamos datos si no hay suficientes movimientos reales
-        const entriesCount = Math.round(Math.random() * 25) + 5
-        const exitsCount = Math.round(Math.random() * 20) + 3
-
-        // Intentamos obtener datos reales si están disponibles
+        // Obtener datos reales de los movimientos
         const monthMovements = movements.filter(m => {
           const moveDate = new Date(m.date)
           return moveDate >= monthStart && moveDate <= monthEnd
         })
 
-        const realEntries = monthMovements.filter(m => m.type === 'entrada').length
-        const realExits = monthMovements.filter(m => m.type === 'salida').length
+        const entries = monthMovements.filter(m => m.type === 'entrada').length
+        const exits = monthMovements.filter(m => m.type === 'salida').length
 
         last7Months.push({
           month: monthLabel,
-          entries: realEntries || entriesCount,
-          exits: realExits || exitsCount
+          entries,
+          exits
         })
       }
 
