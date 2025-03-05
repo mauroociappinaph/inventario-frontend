@@ -144,3 +144,71 @@ export interface InventoryState {
   handleStockMovement: (userId: string, userName: string) => Promise<void>;
   resetMovementForm: () => void;
 }
+
+
+
+// Interfaces para tipado de estadísticas
+export interface ProductStatistics {
+  productId: string;
+  productName: string;
+  currentStock: number;
+  averageConsumption: number;
+  daysUntilReorder: number;
+}
+
+export interface MovementTrend {
+  current: number;
+  previous: number;
+  percentChange: number;
+}
+
+export interface SalesForecast {
+  thisMonth: number;
+  nextMonth: number;
+}
+
+export interface InventoryPredictions {
+  upcomingReorders: ProductStatistics[];
+  salesForecast: SalesForecast;
+}
+
+export interface InventoryTrends {
+  totalMovements: MovementTrend;
+  entries: MovementTrend;
+  exits: MovementTrend;
+}
+
+export interface InventoryStatistics {
+  totalProducts: number;
+  activeProducts?: number;
+  lowStockCount: number;
+  totalStock: number;
+  averagePrice?: number;
+  stockHealth: string;
+  trends?: InventoryTrends;
+  predictions?: InventoryPredictions;
+  roi?: {
+    avgRoi: number;
+    topRoiProducts?: any[];
+  };
+  isFromApi: boolean;
+}
+
+export interface InventoryApiStats {
+  [key: string]: any;
+  trends?: {
+    [key: string]: any;
+  };
+  movements?: {
+    [key: string]: any;
+  };
+  general?: {
+    [key: string]: any;
+  };
+}
+
+export interface Filters {
+  search: string;
+  category: string;
+  stockStatus: string;
+}

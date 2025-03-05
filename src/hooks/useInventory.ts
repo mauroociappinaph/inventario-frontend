@@ -1,74 +1,9 @@
 import { useAuth } from '@/context/auth-context';
 import { useInventoryStore } from '@/store/useInventoryStore';
-import { Product } from '@/types/inventory.interfaces';
+import { Filters, InventoryApiStats, InventoryPredictions, InventoryStatistics, InventoryTrends, Product } from '@/types/inventory.interfaces';
 import axios, { AxiosError } from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 
-// Interfaces para tipado de estadísticas
-interface ProductStatistics {
-  productId: string;
-  productName: string;
-  currentStock: number;
-  averageConsumption: number;
-  daysUntilReorder: number;
-}
-
-interface MovementTrend {
-  current: number;
-  previous: number;
-  percentChange: number;
-}
-
-interface SalesForecast {
-  thisMonth: number;
-  nextMonth: number;
-}
-
-interface InventoryPredictions {
-  upcomingReorders: ProductStatistics[];
-  salesForecast: SalesForecast;
-}
-
-interface InventoryTrends {
-  totalMovements: MovementTrend;
-  entries: MovementTrend;
-  exits: MovementTrend;
-}
-
-interface InventoryStatistics {
-  totalProducts: number;
-  activeProducts?: number;
-  lowStockCount: number;
-  totalStock: number;
-  averagePrice?: number;
-  stockHealth: string;
-  trends?: InventoryTrends;
-  predictions?: InventoryPredictions;
-  roi?: {
-    avgRoi: number;
-    topRoiProducts?: any[];
-  };
-  isFromApi: boolean;
-}
-
-interface InventoryApiStats {
-  [key: string]: any;
-  trends?: {
-    [key: string]: any;
-  };
-  movements?: {
-    [key: string]: any;
-  };
-  general?: {
-    [key: string]: any;
-  };
-}
-
-interface Filters {
-  search: string;
-  category: string;
-  stockStatus: string;
-}
 
 /**
  * Hook personalizado para manejar el inventario con funcionalidades adicionales
@@ -344,8 +279,67 @@ export function useInventory() {
     return 'Bueno';
   };
 
+  // Función auxiliar para calcular porcentajes de cambio
+  const calculatePercentChange = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous) * 100;
+  };
+
   // Estadísticas del inventario (combinando datos locales y de API)
   const inventoryStats = useMemo((): InventoryStatistics => {
+    // Calcular tendencias de movimientos
+    const calculateMovementTrends = (movements: any[]): InventoryTrends => {
+      if (!Array.isArray(movements)) {
+        return {
+          totalMovements: { current: 0, previous: 0, percentChange: 0 },
+          entries: { current: 0, previous: 0, percentChange: 0 },
+          exits: { current: 0, previous: 0, percentChange: 0 }
+        };
+      }
+
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+      // Movimientos del último mes
+      const currentMovements = movements.filter(m =>
+        new Date(m.date) >= thirtyDaysAgo && new Date(m.date) <= now
+      );
+
+      // Movimientos del mes anterior
+      const previousMovements = movements.filter(m =>
+        new Date(m.date) >= sixtyDaysAgo && new Date(m.date) < thirtyDaysAgo
+      );
+
+      // Calcular totales actuales
+      const currentTotal = currentMovements.length;
+      const currentEntries = currentMovements.filter(m => m.type === 'entrada').length;
+      const currentExits = currentMovements.filter(m => m.type === 'salida').length;
+
+      // Calcular totales anteriores
+      const previousTotal = previousMovements.length;
+      const previousEntries = previousMovements.filter(m => m.type === 'entrada').length;
+      const previousExits = previousMovements.filter(m => m.type === 'salida').length;
+
+      return {
+        totalMovements: {
+          current: currentTotal,
+          previous: previousTotal,
+          percentChange: calculatePercentChange(currentTotal, previousTotal)
+        },
+        entries: {
+          current: currentEntries,
+          previous: previousEntries,
+          percentChange: calculatePercentChange(currentEntries, previousEntries)
+        },
+        exits: {
+          current: currentExits,
+          previous: previousExits,
+          percentChange: calculatePercentChange(currentExits, previousExits)
+        }
+      };
+    };
+
     // Si tenemos estadísticas de la API, usar esos datos
     if (inventoryApiStats) {
       console.log('📊 [useInventory] Usando estadísticas de API para calcular ROI');
@@ -358,15 +352,7 @@ export function useInventory() {
         console.warn('⚠️ [useInventory] No se encontraron datos de ROI en inventoryApiStats');
       }
 
-      // Procesar tendencias con datos mejorados
-      const apiTrends = inventoryApiStats.trends || {} as Record<string, any>;
-      const movementsTrend: MovementTrend = {
-        current: apiTrends.currentPeriodMovements || inventoryApiStats.movements?.total || 0,
-        previous: apiTrends.previousPeriodMovements || 0,
-        percentChange: apiTrends.currentPeriodMovements && apiTrends.previousPeriodMovements
-          ? ((apiTrends.currentPeriodMovements - apiTrends.previousPeriodMovements) / apiTrends.previousPeriodMovements) * 100
-          : 0
-      };
+      const movementTrends = calculateMovementTrends(stockMovements);
 
       // Crear predicciones mejoradas
       const predictions: InventoryPredictions = {
@@ -377,48 +363,23 @@ export function useInventory() {
           averageConsumption: product.averageDailyUsage || (Math.random() * 1.5 + 0.5),
           daysUntilReorder: product.estimatedDaysUntilReorder || Math.floor(Math.random() * 15 + 5)
         })),
-        salesForecast: apiTrends.salesForecast || {
-          thisMonth: Math.round(inventoryApiStats.movements?.exits ? inventoryApiStats.movements.exits * 1.1 : 50),
-          nextMonth: Math.round(inventoryApiStats.movements?.exits ? inventoryApiStats.movements.exits * 1.2 : 60)
+        salesForecast: {
+          thisMonth: Math.round(movementTrends.exits.current * 1.1),
+          nextMonth: Math.round(movementTrends.exits.current * 1.2)
         }
       };
 
       return {
-        // Datos de estadísticas generales
         totalProducts: inventoryApiStats.general?.totalProducts || inventoryApiStats.totalProducts || 0,
         activeProducts: inventoryApiStats.general?.activeProducts || inventoryApiStats.activeProducts || 0,
         totalStock: inventoryApiStats.general?.stockValue || inventoryApiStats.inventoryValue || 0,
         lowStockCount: inventoryApiStats.general?.lowStockProducts || inventoryApiStats.lowStockProducts || 0,
-
-        // Tendencias mejoradas
-        trends: {
-          totalMovements: movementsTrend,
-          entries: {
-            current: apiTrends.currentPeriodEntries || inventoryApiStats.movements?.entries || 0,
-            previous: apiTrends.previousPeriodEntries || 0,
-            percentChange: apiTrends.currentPeriodEntries && apiTrends.previousPeriodEntries
-              ? ((apiTrends.currentPeriodEntries - apiTrends.previousPeriodEntries) / apiTrends.previousPeriodEntries) * 100
-              : 0
-          },
-          exits: {
-            current: apiTrends.currentPeriodExits || inventoryApiStats.movements?.exits || 0,
-            previous: apiTrends.previousPeriodExits || 0,
-            percentChange: apiTrends.currentPeriodExits && apiTrends.previousPeriodExits
-              ? ((apiTrends.currentPeriodExits - apiTrends.previousPeriodExits) / apiTrends.previousPeriodExits) * 100
-              : 0
-          }
-        },
-
-        // Predicciones mejoradas
+        trends: movementTrends,
         predictions,
-
-        // Estado general del inventario
         stockHealth: determineStockHealth(
           inventoryApiStats.general?.lowStockProducts || inventoryApiStats.lowStockProducts || 0,
           inventoryApiStats.general?.totalProducts || inventoryApiStats.totalProducts || 0
         ),
-
-        // Flag para indicar que estos datos vienen de la API
         isFromApi: true
       };
     }
@@ -431,29 +392,7 @@ export function useInventory() {
       ? products.reduce((sum, product) => sum + product.price, 0) / totalProducts
       : 0;
 
-    // Simular movimientos para tendencias
-    const movements = Array.isArray(stockMovements) ? stockMovements : [];
-    const totalEntries = movements.filter(m => m.type === 'entrada').length;
-    const totalExits = movements.filter(m => m.type === 'salida').length;
-
-    // Simulación de tendencias locales
-    const trends: InventoryTrends = {
-      totalMovements: {
-        current: movements.length,
-        previous: Math.floor(movements.length * 0.9),
-        percentChange: 11.1 // Simulado: +11.1%
-      },
-      entries: {
-        current: totalEntries,
-        previous: Math.floor(totalEntries * 0.85),
-        percentChange: 17.6 // Simulado: +17.6%
-      },
-      exits: {
-        current: totalExits,
-        previous: Math.floor(totalExits * 0.95),
-        percentChange: 5.3 // Simulado: +5.3%
-      }
-    };
+    const movementTrends = calculateMovementTrends(stockMovements);
 
     // Simulación de predicciones locales
     const topProducts = products
@@ -470,21 +409,21 @@ export function useInventory() {
     const predictions: InventoryPredictions = {
       upcomingReorders: topProducts,
       salesForecast: {
-        thisMonth: Math.round(totalExits * 1.1),
-        nextMonth: Math.round(totalExits * 1.2)
+        thisMonth: Math.round(movementTrends.exits.current * 1.1),
+        nextMonth: Math.round(movementTrends.exits.current * 1.2)
       }
     };
 
     // Simulación de ROI para datos locales
     const simulatedRoi = {
-      avgRoi: 0, // Cambiado de 250 a 0 para que no muestre un valor incorrecto cuando no hay datos reales
+      avgRoi: 0,
       topRoiProducts: products.slice(0, 5).map(p => ({
         _id: p.id,
         productName: p.name,
         totalSalidas: Math.floor(Math.random() * 30 + 10),
         totalValorSalidas: p.price * (Math.floor(Math.random() * 30 + 10)),
         costoPromedio: p.price * 0.6,
-        roi: 0 // Cambiado para no mostrar valores simulados altos
+        roi: 0
       }))
     };
 
@@ -493,7 +432,7 @@ export function useInventory() {
       totalStock,
       lowStockCount,
       averagePrice,
-      trends,
+      trends: movementTrends,
       predictions,
       roi: simulatedRoi,
       stockHealth: determineStockHealth(lowStockCount, totalProducts),
